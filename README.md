@@ -17,7 +17,8 @@ optional arguments:
   -l, --list                    list everything
   --list-sources                list sources
   --list-sinks                  list sinks
-  --id ID                       specify ID. If no ID specified - master sink is used
+  --id ID                       specify ID. If no ID specified - master sink
+                                is used
   --set-volume n                set volume for ID
   --set-volume-all [n [n ...]]  set volume for ID (for every channel)
   --change-volume +-n           change volume for ID
@@ -25,6 +26,7 @@ optional arguments:
   --toggle-mute                 toggle mute for ID
   --get-volume                  get volume for ID
   --mute                        mute ID
+
 ```
 
 
