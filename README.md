@@ -30,7 +30,7 @@ optional arguments:
 ```
 
 
-If no options are specified - interactive mode is used. Which looks like this:
+If no options specified - interactive mode is used. Which looks like this:
 ![Image of whatever](../img//scrn.png?raw=true)
 
 And has the following controls:
