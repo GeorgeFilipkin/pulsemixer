@@ -1331,10 +1331,10 @@ class Screen():
             name = bar.fullname
             if len(name) > self.cols - 20:
                 name = name[:self.cols - 20]
-            self.info += '\n{}|{}\n{}|{}\n{}: {}|{}'.format( 
-                    "L ", self.red if bar.locked else curses.A_DIM, 
-                    "M  ", self.red if bar.muted else curses.A_DIM, 
-                    name, side, curses.A_NORMAL)
+            self.info += '\n{}|{}\n{}|{}\n{}: {}|{}'.format(
+                "L ", self.red if bar.locked else curses.A_DIM,
+                "M  ", self.red if bar.muted else curses.A_DIM,
+                name, side, curses.A_NORMAL)
 
     def calcLines(self):
         resize = curses.is_term_resized(curses.LINES, curses.COLS)
