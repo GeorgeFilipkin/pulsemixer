@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# TODO: live, bindings typefix
 from ctypes import *
 import sys
 import curses
@@ -120,7 +119,7 @@ class PA_SOURCE_OUTPUT_INFO(Structure):
         ("resample_method", c_char_p),
         ("driver",          c_char_p),
         ("proplist",        POINTER(c_int)),
-        ('corked',          c_int),
+        ("corked",          c_int),
         ("volume",          PA_CVOLUME),
         ("mute",            c_int),
         ('has_volume',      c_int),
@@ -765,13 +764,11 @@ class Pulse():
     def getVolumeMono(self, obj):
         return int(sum(obj.volume.values) / len(obj.volume.values))
 
-    # FIXME needed?
     def fill_clients(self):
         if not self.data:
             return
         data, self.data = self.data, None
         clist = self.pulse_client_list()
-        # FIXME: rewrite
         for d in data:
             for c in clist:
                 if c.index == d.client_id:
@@ -1179,13 +1176,6 @@ class PulseVolume():
 class PulseVolumeC(PulseVolume):
 
     def __init__(self, cvolume):
-        # AZAZAZA
-        # FIXME lolwut either something missing or too much in ctypes or order
-        # check docs and examples
-        if cvolume.channels == 0:
-            cvolume.channels = cvolume.values[0]
-            cvolume.values[0] = cvolume.values[1]
-            cvolume.values[1] = cvolume.values[2]
         self.channels = cvolume.channels
         self.values = [(round(x * 100 / PA_VOLUME_NORM))
                        for x in cvolume.values[:self.channels]]
@@ -1288,11 +1278,10 @@ class Screen():
             shift += len(''.join(p[:-1]))
 
     def changeMode(self, mode):
-        self.focusLineNum, self.topLineNum = 0, 0
-        self.getData()
-        self.screen.refresh()
         self.MODE = self.MODE.fromkeys(self.MODE, 0)
         self.MODE[mode] = 1
+        self.getData()
+        self.focusLineNum, self.topLineNum = 0, 0
 
     def updateMenu(self):
         self.menu = '{}|{}\n  {}|{}\n  {}|{}\n  {}|{}'.format(
@@ -1322,9 +1311,6 @@ class Screen():
             side = 'Side Right'
         else:
             side = None
-        # self.info = '{:<7}|{}\n{:<5}|{}'.format(
-        #    str(focus) + '/' + str(self.nLines), curses.A_BOLD,
-        #    "M - mute  SPACE - lock channels together", curses.A_DIM)
         self.info = '{:<6}|{}'.format(
             (str(focus) if self.nLines else '0') + '/' + str(self.nLines), curses.A_BOLD)
         if side:
@@ -1392,7 +1378,6 @@ class Screen():
                 bar.move(1, side)
 
     def getData(self):
-        # FIXME: rewrite this shitty shit
         def fill(t, f):
             for s in f:
                 found = False
@@ -1400,19 +1385,19 @@ class Screen():
                     if s.index in data:
                         found = True
                         data[0].pollData(s)
-                        # self.screen.refresh()
                 if not found:
                     bar = Bar(s)
                     for c in range(s.volume.channels):
                         t.append((bar, c, s.index))
-            for i, data in enumerate(t):
+            for i in range(len(t) - 1, -1, -1):
                 found = False
+                element = t[i]
                 for s in f:
-                    if data[2] == s.index:
+                    if element[2] == s.index:
                         found = True
+                        break
                 if not found:
-                    t.pop(i)
-                    self.focusLineNum = max(0, len(t) - 1)
+                    del t[i]
             return t
 
         if self.MODE[1]:
@@ -1469,7 +1454,6 @@ class Screen():
                     line.name, focusHi,
                     line.volume[0], focusHi)
             elif bartype is Bar.RIGHT:
-                #"Live: " + str(line.live), focusHi,
                 line = '{:>15}|{}\n {}|{}\n {:<3}|{}\n '.format(
                     "Locked", self.red if line.locked else curses.A_DIM,
                     "Muted ", self.red if line.muted else curses.A_DIM,
