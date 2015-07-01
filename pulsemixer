@@ -1,10 +1,26 @@
 #!/usr/bin/env python3
+'''
+Usage of pulsemixer:
+  -h, --help               show this help message and exit
+  -l, --list               list everything
+  --list-sources           list sources
+  --list-sinks             list sinks
+  --id ID                  specify ID. If no ID specified - master sink is used
+  --set-volume n           set volume for ID
+  --set-volume-all n:n     set volume for ID (for every channel)
+  --change-volume +-n      change volume for ID
+  --get-mute               get mute for ID
+  --toggle-mute            toggle mute for ID
+  --get-volume             get volume for ID
+  --mute                   mute ID
+  --unmute                 unmute ID
+'''
 from ctypes import *
 import sys
 import curses
 import os
 import re
-import argparse
+import getopt
 import signal
 from pprint import pprint
 
@@ -1495,58 +1511,26 @@ class Screen():
             self.focusLineNum = nextLineNum
 
 
-def main():
-    formatter = lambda prog: argparse.HelpFormatter('pulsemixer',
-                                                    max_help_position=35)
-    parser = argparse.ArgumentParser(formatter_class=formatter)
-    parser.add_argument("-l",
-                        "--list",
-                        help='list everything',
-                        action='store_true')
-    parser.add_argument("--list-sources",
-                        help='list sources',
-                        action='store_true')
-    parser.add_argument("--list-sinks",
-                        help='list sinks',
-                        action='store_true')
-    parser.add_argument("--id",
-                        help='specify ID. If no ID '
-                        'specified - master sink is used',
-                        type=int)
-    parser.add_argument("--set-volume",
-                        help='set volume for ID',
-                        metavar="n",
-                        type=int)
-    parser.add_argument("--set-volume-all",
-                        help='set volume for ID (for every channel)',
-                        metavar='n',
-                        type=int,
-                        nargs='*')
-    parser.add_argument("--change-volume",
-                        help='change volume for ID',
-                        metavar='+-n',
-                        type=int)
-    parser.add_argument("--get-mute",
-                        help='get mute for ID',
-                        action='store_true')
-    parser.add_argument("--toggle-mute",
-                        help='toggle mute for ID',
-                        action='store_true')
-    parser.add_argument("--get-volume",
-                        help='get volume for ID',
-                        action='store_true')
-    parser.add_argument("--mute", help='mute ID', action='store_true')
-    parser.add_argument("--unmute", help='unmute ID', action='store_true')
-    args = parser.parse_args()
+def usage():
+    print(__doc__)
 
+
+def main():
+    try:
+        opts, args = getopt.getopt(
+            sys.argv[1:], "hl",
+            ["help", "list", "list-sinks", "list-sources", "id=",
+             "set-volume=", "set-volume-all=", "change-volume=", "get-volume",
+             "get-mute", "toggle-mute", "mute", "unmute"])
+    except getopt.GetoptError as err:
+        sys.exit("ERR: {}".format(err))
     sinks = pulse.pulse_sink_list()
     sink_inputs = pulse.pulse_sink_input_list()
     sources = pulse.pulse_source_list()
     source_outputs = pulse.pulse_source_output_list()
     streams = {}
-    index = None
     try:
-        index = sinks[0].index if not args.id else args.id
+        index = sinks[0].index
     except:
         sys.exit("ERR: Can't find master sink")
     for i in sinks + sink_inputs + sources + source_outputs:
@@ -1554,70 +1538,79 @@ def main():
     checkId = lambda x: x in streams or sys.exit('ERR: No such ID: ' + str(x))
     checkId(index)
 
-    if args.list:
-        for sink in sink_inputs:
-            print("Sink_input:\t", sink)
-        for source in source_outputs:
-            print("Source_output:\t", source)
-        for sink in sinks:
-            print("Sink:\t\t", sink)
-        for source in sources:
-            print("Source:\t\t", source)
-
-    if args.list_sinks:
-        for sink in sink_inputs:
-            print("Sink_input:\t", sink)
-        for sink in sinks:
-            print("Sink:\t\t", sink)
-
-    if args.list_sources:
-        for source in source_outputs:
-            print("Source_output:\t", source)
-        for source in sources:
-            print("Source:\t\t", source)
-
-    if args.get_mute:
-        print(streams[index].mute)
-
-    if args.mute:
-        pulse.muteStream(streams[index])
-
-    if args.unmute:
-        pulse.unmuteStream(streams[index])
-
-    if args.toggle_mute:
-        if streams[index].mute:
-            pulse.unmuteStream(streams[index])
-        else:
-            pulse.muteStream(streams[index])
-
-    if args.get_volume:
-        print(*streams[index].volume.values)
-
-    if args.set_volume:
-        vol = streams[index].volume
-        for i, _ in enumerate(vol.values):
-            vol.values[i] = args.set_volume
-        pulse.setVolume(streams[index], vol)
-
-    if args.set_volume_all:
-        vol = streams[index].volume
-        if len(args.set_volume_all) != len(vol.values):
-            sys.exit("ERR: Specified volumes not equal to number of channles"
-                     "in the stream")
-        for i, _ in enumerate(vol.values):
-            vol.values[i] = args.set_volume_all[i]
-        pulse.setVolume(streams[index], vol)
-
-    if args.change_volume:
-        vol = streams[index].volume
-        for i, _ in enumerate(vol.values):
-            vol.values[i] += args.change_volume
-        pulse.setVolume(streams[index], vol)
-
     if len(sys.argv) == 1:
         scr = Screen()
         curses.wrapper(scr.run)
+
+    for opt, arg in opts:
+        if opt in ('-h', '--help'):
+            sys.exit(usage())
+
+        elif opt == '--id':
+            index = int(arg)
+
+        elif opt in ('-l', '--list'):
+            for sink in sink_inputs:
+                print("Sink_input:\t", sink)
+            for source in source_outputs:
+                print("Source_output:\t", source)
+            for sink in sinks:
+                print("Sink:\t\t", sink)
+            for source in sources:
+                print("Source:\t\t", source)
+
+        elif opt == '--list-sinks':
+            for sink in sink_inputs:
+                print("Sink_input:\t", sink)
+            for sink in sinks:
+                print("Sink:\t\t", sink)
+
+        elif opt == '--list-sources':
+            for source in source_outputs:
+                print("Source_output:\t", source)
+            for source in sources:
+                print("Source:\t\t", source)
+
+        elif opt == '--get-mute':
+            print(streams[index].mute)
+
+        elif opt == '--mute':
+            pulse.muteStream(streams[index])
+
+        elif opt == '--unmute':
+            pulse.unmuteStream(streams[index])
+
+        elif opt == '--toggle-mute':
+            if streams[index].mute:
+                pulse.unmuteStream(streams[index])
+            else:
+                pulse.muteStream(streams[index])
+
+        elif opt == '--get-volume':
+            print(*streams[index].volume.values)
+
+        elif opt == '--set-volume':
+            vol = streams[index].volume
+            for i, _ in enumerate(vol.values):
+                vol.values[i] = int(arg)
+            pulse.setVolume(streams[index], vol)
+
+        elif opt == '--set-volume-all':
+            vol = streams[index].volume
+            arg = arg.strip(':').split(':')
+            if len(arg) != len(vol.values):
+                sys.exit("ERR: Specified volumes not equal to number of channles"
+                         "in the stream")
+            for i, _ in enumerate(vol.values):
+                vol.values[i] = int(arg[i])
+            pulse.setVolume(streams[index], vol)
+
+        elif opt == '--change-volume':
+            vol = streams[index].volume
+            for i, _ in enumerate(vol.values):
+                vol.values[i] += int(arg)
+            pulse.setVolume(streams[index], vol)
+
 
 if __name__ == '__main__':
     main()
