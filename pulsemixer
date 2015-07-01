@@ -1381,9 +1381,25 @@ class Screen():
                 continue
 
             if c == curses.KEY_UP or c == ord('k'):
-                self.scroll(self.UP)
+                if bar.locked:
+                    if self.data[focus][1] == 0:
+                        n = 1
+                    else:
+                        n = self.data[focus][1]+1
+                        #n = ((self.data[focus][3])-self.data[focus][1])+1
+                    [self.scroll(self.UP) for _ in range(n)]
+                else:
+                    self.scroll(self.UP)
             elif c == curses.KEY_DOWN or c == ord('j'):
-                self.scroll(self.DOWN)
+                if bar.locked:
+                    if self.data[focus][1] == self.data[focus][3]-1:
+                        n = 1
+                    else:
+                        #n = self.data[focus][1]+2
+                        n = ((self.data[focus][3]-1)-self.data[focus][1])+1
+                    [self.scroll(self.DOWN) for _ in range(n)]
+                else:
+                    self.scroll(self.DOWN)
             elif c == ord('m'):
                 bar.muteToggle()
             elif c == self.SPACE_KEY:
@@ -1404,7 +1420,7 @@ class Screen():
                 if not found:
                     bar = Bar(s)
                     for c in range(s.volume.channels):
-                        t.append((bar, c, s.index))
+                        t.append((bar, c, s.index, s.volume.channels))
             for i in range(len(t) - 1, -1, -1):
                 found = False
                 element = t[i]
@@ -1414,6 +1430,7 @@ class Screen():
                         break
                 if not found:
                     del t[i]
+                    self.focusLineNum -= 1
             return t
 
         if self.MODE[1]:
@@ -1460,6 +1477,9 @@ class Screen():
                 arrow = '━'
             elif line in same:
                 focusHi = curses.A_BOLD
+                if line.locked:
+                    focusHi = bracketHi = curses.A_BOLD
+                    arrow = '━'
 
             vol = list('-' * (self.cols - 32))
             n = round(len(vol) * line.volume[bartype] / line.maxsize)
