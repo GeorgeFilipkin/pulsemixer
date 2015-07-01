@@ -1444,6 +1444,7 @@ class Screen():
 
         self.nLines = len(self.data)
         if not self.nLines:
+            self.focusLineNum = 0
             self.data.append((Bar('no data'), Bar.NONE, 0))
 
     def display(self):
