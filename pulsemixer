@@ -1408,6 +1408,10 @@ class Screen():
                 bar.move(-1, side)
             elif c == curses.KEY_RIGHT or c == ord('l'):
                 bar.move(1, side)
+            elif c == curses.KEY_SLEFT or c == ord('H'):
+                bar.move(-10, side)
+            elif c == curses.KEY_SRIGHT or c == ord('L'):
+                bar.move(10, side)
 
     def getData(self):
         def fill(t, f):
