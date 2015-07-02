@@ -1263,8 +1263,7 @@ class Screen():
     MODE = {1: 1, 2: 0, 3: 0, 4: 0}
 
     def __init__(self):
-        self.log = open("log", 'w')
-        os.environ['ESCDELAY'] = '25'  # since we don't need alt-sequence
+        os.environ['ESCDELAY'] = '25'
         self.screen = curses.initscr()
         self.screen.timeout(500)
         curses.curs_set(0)
