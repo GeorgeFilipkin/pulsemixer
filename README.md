@@ -36,11 +36,12 @@ If no arguments given - interactive mode is used. Which looks like this:
 
 And has the following controls:
 ```
-h/j/k/l - navigation, volume change. Or you can use arrows, yes.
-H/L, Shift+Left/Shift+Right - change volume by 10
-M - mute/unmute
-Space - lock/unlock channels together
-Q/Esc/^C - quit
+  h/j/k/l                       navigation, volume change
+  arrows                        navigation, volume change
+  H/L, Shift+Left/Shift+Right   change volume by 10
+  m                             mute/unmute
+  Space                         lock/unlock channels together
+  q/Esc/^C                      quit
 ```
 
 ## License
