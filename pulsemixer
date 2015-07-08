@@ -14,6 +14,14 @@ Usage of pulsemixer:
   --get-volume             get volume for ID
   --mute                   mute ID
   --unmute                 unmute ID
+
+Interactive usage:
+  h/j/k/l                       navigation, volume change
+  arrows                        navigation, volume change
+  H/L, Shift+Left/Shift+Right   change volume by 10
+  m                             mute/unmute
+  Space                         lock/unlock channels together
+  q/Esc/^C                      quit
 '''
 from ctypes import *
 import sys
