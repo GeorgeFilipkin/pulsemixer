@@ -1384,18 +1384,18 @@ class Screen():
                     if self.data[focus][1] == 0:
                         n = 1
                     else:
-                        n = self.data[focus][1]+1
+                        n = self.data[focus][1] + 1
                         #n = ((self.data[focus][3])-self.data[focus][1])+1
                     [self.scroll(self.UP) for _ in range(n)]
                 else:
                     self.scroll(self.UP)
             elif c == curses.KEY_DOWN or c == ord('j'):
                 if bar.locked:
-                    if self.data[focus][1] == self.data[focus][3]-1:
+                    if self.data[focus][1] == self.data[focus][3] - 1:
                         n = 1
                     else:
                         #n = self.data[focus][1]+2
-                        n = ((self.data[focus][3]-1)-self.data[focus][1])+1
+                        n = ((self.data[focus][3] - 1) - self.data[focus][1]) + 1
                     [self.scroll(self.DOWN) for _ in range(n)]
                 else:
                     self.scroll(self.DOWN)
