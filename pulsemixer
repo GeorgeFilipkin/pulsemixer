@@ -1565,7 +1565,7 @@ def main():
         index = sinks[0].index
     except:
         sys.exit("ERR: Can't find master sink")
-    for i in sinks + sink_inputs + sources + source_outputs:
+    for i in sources + source_outputs + sink_inputs + sinks:
         streams[i.index] = i
     checkId = lambda x: x in streams or sys.exit('ERR: No such ID: ' + str(x))
     checkId(index)
