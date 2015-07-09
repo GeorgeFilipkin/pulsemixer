@@ -21,6 +21,8 @@ Interactive usage:
   H/L, Shift+Left/Shift+Right   change volume by 10
   m                             mute/unmute
   Space                         lock/unlock channels together
+  F1/F2/F3/F4                   change modes
+  Tab                           go to next mode
   q/Esc/^C                      quit
 '''
 from ctypes import *
@@ -1306,6 +1308,12 @@ class Screen():
         self.getData()
         self.focusLineNum, self.topLineNum = 0, 0
 
+    def nextMode(self):
+        for mode, active in self.MODE.items():
+            if active == 1:
+                self.changeMode(1 + (mode % len(self.MODE)))
+                return
+
     def updateMenu(self):
         self.menu = '{}|{}\n  {}|{}\n  {}|{}\n  {}|{}'.format(
             "F1 Playback", curses.A_BOLD if self.MODE[1] else curses.A_DIM,
@@ -1381,6 +1389,8 @@ class Screen():
                 self.changeMode(3)
             elif c == curses.KEY_F4:
                 self.changeMode(4)
+            elif c == ord('\t'):
+                self.nextMode()
             elif c == ord('q') or c == self.ESC_KEY:
                 return
 
