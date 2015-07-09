@@ -32,6 +32,7 @@ import os
 import re
 import getopt
 import signal
+from base64 import b64encode
 from pprint import pprint
 
 #########################################################################################
@@ -1238,6 +1239,14 @@ class Bar():
         self.locked = True
         self.pa = pa
 
+    @staticmethod
+    def hasher(pa):
+        if type(pa) is PulseSinkInfo or type(pa) is PulseSourceInfo:
+            name = pa.description.decode()
+        else:
+            name = pa.client.name.decode()
+        return b64encode(bytes(name+str(pa.index)+pa.__class__.__name__, 'ascii'))
+
     def pollData(self, pa):
         self.channels = pa.volume.channels
         self.volume = pa.volume.values
@@ -1435,18 +1444,19 @@ class Screen():
             for s in f:
                 found = False
                 for i, data in enumerate(t):
-                    if s.index in data:
+                    if Bar.hasher(s) == data[2]:
                         found = True
                         data[0].pollData(s)
                 if not found:
+                    hashed = Bar.hasher(s)
                     bar = Bar(s)
                     for c in range(s.volume.channels):
-                        t.append((bar, c, s.index, s.volume.channels))
+                        t.append((bar, c, hashed, s.volume.channels))
             for i in range(len(t) - 1, -1, -1):
                 found = False
                 element = t[i]
                 for s in f:
-                    if element[2] == s.index:
+                    if element[2] == Bar.hasher(s):
                         found = True
                         break
                 if not found:
