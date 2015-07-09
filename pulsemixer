@@ -1461,7 +1461,9 @@ class Screen():
                         break
                 if not found:
                     del t[i]
-                    self.focusLineNum -= 1
+                    focus = self.focusLineNum
+                    if self.focusLineNum >= i:
+                        self.focusLineNum = max(min(focus, focus - 1), 0)
             return t
 
         if self.MODE[1]:
