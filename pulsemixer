@@ -1085,7 +1085,7 @@ class PulseSinkInputInfo(PulseSink):
                            pa_sink_input_info.name,
                            pa_sink_input_info.mute,
                            PulseVolumeC(pa_sink_input_info.volume),
-                           PulseClient(self.__class__.__name__.encode()))
+                           PulseClient(pa_sink_input_info.name))
         self.owner_module = pa_sink_input_info.owner_module
         self.client_id = pa_sink_input_info.client
         self.sink = pa_sink_input_info.sink
@@ -1155,7 +1155,7 @@ class PulseSourceOutputInfo(PulseSource):
                              pa_source_output_info.name,
                              pa_source_output_info.mute,
                              PulseVolumeC(pa_source_output_info.volume),
-                             PulseClient(self.__class__.__name__.encode()))
+                             PulseClient(pa_source_output_info.name))
         self.owner_module = pa_source_output_info.owner_module
         self.client_id = pa_source_output_info.client
         self.source = pa_source_output_info.source
