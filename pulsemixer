@@ -1286,7 +1286,6 @@ class Screen():
         curses.curs_set(0)
         self.screen.border(0)
         self.index = 0
-        self.log = open('log', 'w')
         self.topLineNum = 0
         self.focusLineNum = 0
         self.lines, self.cols = curses.LINES - 1, curses.COLS
