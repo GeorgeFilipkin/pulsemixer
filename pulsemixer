@@ -1332,7 +1332,13 @@ class Screen():
 
     def updateInfo(self):
         focus = self.focusLineNum + self.topLineNum + 1
-        bar, side = self.data[focus - 1][0], self.data[focus - 1][1]
+        try:
+            bar, side = self.data[focus - 1][0], self.data[focus - 1][1]
+        except IndexError:
+            self.focusLineNum, self.topLineNum = 0, 0
+            for _ in range(len(self.data)):
+                self.scroll(self.UP)
+            return
         if side is Bar.LEFT:
             side = 'Left'
         elif side is Bar.RIGHT:
@@ -1443,12 +1449,12 @@ class Screen():
         def fill(t, f):
             for s in f:
                 found = False
+                hashed = Bar.hasher(s)
                 for i, data in enumerate(t):
-                    if Bar.hasher(s) == data[2]:
+                    if hashed == data[2]:
                         found = True
                         data[0].pollData(s)
                 if not found:
-                    hashed = Bar.hasher(s)
                     bar = Bar(s)
                     for c in range(s.volume.channels):
                         t.append((bar, c, hashed, s.volume.channels))
