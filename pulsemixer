@@ -1244,7 +1244,7 @@ class Bar():
             name = pa.description.decode()
         else:
             name = pa.client.name.decode()
-        return b64encode(bytes(name+str(pa.index)+pa.__class__.__name__, 'ascii'))
+        return b64encode(bytes(name + str(pa.index) + pa.__class__.__name__, 'ascii'))
 
     def pollData(self, pa):
         self.channels = pa.volume.channels
@@ -1286,6 +1286,7 @@ class Screen():
         curses.curs_set(0)
         self.screen.border(0)
         self.index = 0
+        self.log = open('log', 'w')
         self.topLineNum = 0
         self.focusLineNum = 0
         self.lines, self.cols = curses.LINES - 1, curses.COLS
@@ -1425,7 +1426,6 @@ class Screen():
                         n = 1
                     else:
                         n = self.data[focus][1] + 1
-                        #n = ((self.data[focus][3])-self.data[focus][1])+1
                     [self.scroll(self.UP) for _ in range(n)]
                 else:
                     self.scroll(self.UP)
@@ -1434,7 +1434,6 @@ class Screen():
                     if self.data[focus][1] == self.data[focus][3] - 1:
                         n = 1
                     else:
-                        #n = self.data[focus][1]+2
                         n = ((self.data[focus][3] - 1) - self.data[focus][1]) + 1
                     [self.scroll(self.DOWN) for _ in range(n)]
                 else:
@@ -1517,19 +1516,32 @@ class Screen():
                 elif found:
                     break
 
+            if bartype == Bar.LEFT:
+                if line.channels != 1:
+                    brackets = ['┌', '┐']
+                else:
+                    brackets = ['╶', '╴']
+            elif bartype == line.channels - 1:
+                brackets = ['└', '┘']
+            else:
+                brackets = ['├', '┤']
+
             # focus current lines
             focusHi, bracketHi, arrow = 0, 0, ''
             if index == self.focusLineNum:
                 focusHi = bracketHi = curses.A_BOLD
-                arrow = '━'
+                arrow = '─'
             elif line in same:
                 focusHi = curses.A_BOLD
                 if line.locked:
                     focusHi = bracketHi = curses.A_BOLD
-                    arrow = '━'
+                    arrow = '─'
 
-            vol = list('-' * (self.cols - 32))
-            n = round(len(vol) * line.volume[bartype] / line.maxsize)
+            cols = self.cols - 32
+            if cols%3:
+                cols -= 1
+            vol = list('-' * int(cols))
+            n = int(len(vol) * line.volume[bartype] / line.maxsize)
             vol[:n] = '⬛' * n
             vol = ''.join(vol)
             if bartype is Bar.LEFT:
@@ -1547,9 +1559,9 @@ class Screen():
             for i, v in enumerate(re.findall('.{{{}}}'.format(len(vol) // 3), vol)):
                 volbar += '\n{}|{}'.format(v, gradient[i] | focusHi)
             line += '{:>1}|{}\n{}|{}{}\n{}|{}\n{}|{}'.format(arrow, bracketHi,
-                                                             '[', bracketHi,
+                                                             brackets[0], bracketHi,
                                                              volbar,
-                                                             ']', bracketHi,
+                                                             brackets[1], bracketHi,
                                                              arrow, bracketHi)
             self.displayLine(index + 1, line)
         self.displayLine(self.lines + 1, self.info)
