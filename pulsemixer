@@ -1233,7 +1233,6 @@ class Bar():
         self.index = pa.index
         self.channels = pa.volume.channels
         self.volume = pa.volume.values
-        self.live = pulse.getVolumeMono(pa)
         self.maxsize = 150
         self.muted = pa.mute
         self.locked = True
@@ -1251,7 +1250,6 @@ class Bar():
         self.channels = pa.volume.channels
         self.volume = pa.volume.values
         self.muted = pa.mute
-        self.live = pulse.getVolumeMono(pa)
         self.volume = pa.volume.values
         self.pa = pa
 
@@ -1339,34 +1337,43 @@ class Screen():
             for _ in range(len(self.data)):
                 self.scroll(self.UP)
             return
-        if side is Bar.LEFT:
-            side = 'Left'
-        elif side is Bar.RIGHT:
-            side = 'Right'
-        elif side is Bar.RLEFT:
-            side = 'Rear Left'
-        elif side is Bar.RRIGHT:
-            side = 'Rear Right'
-        elif side is Bar.CENTER:
-            side = 'Center'
-        elif side is Bar.SUB:
-            side = 'Subwoofer'
-        elif side is Bar.SLEFT:
-            side = 'Side Left'
-        elif side is Bar.SRIGHT:
-            side = 'Side Right'
+        if side is Bar.NONE:
+            self.info = str
+            return
+        if bar.locked:
+            top = focus - side
+            if bar.channels == 1:
+                n = str(top)
+            else:
+                bot = focus + (bar.channels - (side)) - 1
+                n = '{}-{}'.format(top, bot)
+            side = 'All'
         else:
-            side = None
-        self.info = '{:<6}|{}'.format(
-            (str(focus) if self.nLines else '0') + '/' + str(self.nLines), curses.A_BOLD)
-        if side:
-            name = bar.fullname
-            if len(name) > self.cols - 20:
-                name = name[:self.cols - 20]
-            self.info += '\n{}|{}\n{}|{}\n{}: {}|{}'.format(
-                "L ", self.red if bar.locked else curses.A_DIM,
-                "M  ", self.red if bar.muted else curses.A_DIM,
-                name, side, curses.A_NORMAL)
+            n = str(focus)
+            if side is Bar.LEFT:
+                side = 'Left' if bar.channels != 1 else 'Mono'
+            elif side is Bar.RIGHT:
+                side = 'Right'
+            elif side is Bar.RLEFT:
+                side = 'Rear Left'
+            elif side is Bar.RRIGHT:
+                side = 'Rear Right'
+            elif side is Bar.CENTER:
+                side = 'Center'
+            elif side is Bar.SUB:
+                side = 'Subwoofer'
+            elif side is Bar.SLEFT:
+                side = 'Side Left'
+            elif side is Bar.SRIGHT:
+                side = 'Side Right'
+        self.info = '{:<7}|{}'.format(n + '/' + str(self.nLines), curses.A_BOLD)
+        name = '{}: {}'.format(bar.fullname, side)
+        if len(name) > self.cols - 14:
+            name = '{}: {}'.format(bar.fullname[:self.cols - (18 + len(side))], side)
+        self.info += '\n{}|{}\n{}|{}\n{}|{}'.format(
+            "L ", self.red if bar.locked else curses.A_DIM,
+            "M  ", self.red if bar.muted else curses.A_DIM,
+            name, curses.A_NORMAL)
 
     def calcLines(self):
         resize = curses.is_term_resized(curses.LINES, curses.COLS)
@@ -1389,7 +1396,7 @@ class Screen():
                 self.display()
             except curses.error as e:
                 self.screen.erase()
-                self.screen.addstr('=(0)=\nCan you make it any bigger?\n')
+                self.screen.addstr('Can you make it any bigger?\n')
                 self.screen.addstr(str(e))
 
             focus = self.topLineNum + self.focusLineNum
