@@ -1291,7 +1291,7 @@ class Screen():
         self.lines, self.cols = curses.LINES - 1, curses.COLS
         self.info, self.menu = str, str
         self.data = []
-        self.f1, self.f2, self.f3, self.f4 = [], [], [], []
+        self.modes = [[[], 0, 0] for i in range(4)]
         self.nLines = 0
         curses.start_color()
         curses.use_default_colors()
@@ -1310,10 +1310,14 @@ class Screen():
             shift += len(''.join(p[:-1]))
 
     def changeMode(self, mode):
+        oldmode = list(self.MODE.keys())[list(self.MODE.values()).index(1)] - 1
+        self.modes[oldmode][1] = self.focusLineNum
+        self.modes[oldmode][2] = self.topLineNum
         self.MODE = self.MODE.fromkeys(self.MODE, 0)
         self.MODE[mode] = 1
         self.getData()
-        self.focusLineNum, self.topLineNum = 0, 0
+        self.focusLineNum = self.modes[mode-1][1]
+        self.topLineNum = self.modes[mode-1][2]
 
     def nextMode(self):
         for mode, active in self.MODE.items():
@@ -1375,7 +1379,7 @@ class Screen():
             "M  ", self.red if bar.muted else curses.A_DIM,
             name, curses.A_NORMAL)
 
-    def calcLines(self):
+    def checkResize(self):
         resize = curses.is_term_resized(curses.LINES, curses.COLS)
         if resize:
             y, x = self.screen.getmaxyx()
@@ -1391,7 +1395,7 @@ class Screen():
             self.getData()
             self.updateMenu()
             self.updateInfo()
-            self.calcLines()
+            self.checkResize()
             try:
                 self.display()
             except curses.error as e:
@@ -1450,41 +1454,41 @@ class Screen():
             elif c == curses.KEY_SRIGHT or c == ord('L'):
                 bar.move(10, side)
 
-    def getData(self):
-        def fill(t, f):
+    def fill(self, t, f):
+        for s in f:
+            found = False
+            hashed = Bar.hasher(s)
+            for i, data in enumerate(t):
+                if hashed == data[2]:
+                    found = True
+                    data[0].pollData(s)
+            if not found:
+                bar = Bar(s)
+                for c in range(s.volume.channels):
+                    t.append((bar, c, hashed, s.volume.channels))
+        for i in range(len(t) - 1, -1, -1):
+            found = False
+            element = t[i]
             for s in f:
-                found = False
-                hashed = Bar.hasher(s)
-                for i, data in enumerate(t):
-                    if hashed == data[2]:
-                        found = True
-                        data[0].pollData(s)
-                if not found:
-                    bar = Bar(s)
-                    for c in range(s.volume.channels):
-                        t.append((bar, c, hashed, s.volume.channels))
-            for i in range(len(t) - 1, -1, -1):
-                found = False
-                element = t[i]
-                for s in f:
-                    if element[2] == Bar.hasher(s):
-                        found = True
-                        break
-                if not found:
-                    del t[i]
-                    focus = self.focusLineNum
-                    if self.focusLineNum >= i:
-                        self.focusLineNum = max(min(focus, focus - 1), 0)
-            return t
+                if element[2] == Bar.hasher(s):
+                    found = True
+                    break
+            if not found:
+                del t[i]
+                focus = self.focusLineNum
+                if self.focusLineNum >= i:
+                    self.focusLineNum = max(min(focus, focus - 1), 0)
+        return t
 
+    def getData(self):
         if self.MODE[1]:
-            self.data = fill(self.f1, pulse.pulse_sink_input_list())
+            self.data = self.fill(self.modes[0][0], pulse.pulse_sink_input_list())
         elif self.MODE[2]:
-            self.data = fill(self.f2, pulse.pulse_source_output_list())
+            self.data = self.fill(self.modes[1][0], pulse.pulse_source_output_list())
         elif self.MODE[3]:
-            self.data = fill(self.f3, pulse.pulse_sink_list())
+            self.data = self.fill(self.modes[2][0], pulse.pulse_sink_list())
         elif self.MODE[4]:
-            self.data = fill(self.f4, pulse.pulse_source_list())
+            self.data = self.fill(self.modes[3][0], pulse.pulse_source_list())
 
         self.nLines = len(self.data)
         if not self.nLines:
