@@ -25,13 +25,14 @@ Interactive usage:
   Tab                           go to next mode
   q/Esc/^C                      quit
 '''
+
 from ctypes import *
 import sys
 import curses
-import os
 import re
 import getopt
 import signal
+from os import environ
 from base64 import b64encode
 from pprint import pprint
 
@@ -1280,7 +1281,7 @@ class Screen():
     MODE = {1: 1, 2: 0, 3: 0, 4: 0}
 
     def __init__(self):
-        os.environ['ESCDELAY'] = '25'
+        environ['ESCDELAY'] = '25'
         self.screen = curses.initscr()
         self.screen.timeout(500)
         curses.curs_set(0)
@@ -1301,6 +1302,7 @@ class Screen():
         self.green = curses.color_pair(1)
         self.yellow = curses.color_pair(2)
         self.red = curses.color_pair(3)
+        self.gradient = [self.green, self.yellow, self.red]
 
     def displayLine(self, index, line):
         shift = 0
@@ -1316,8 +1318,8 @@ class Screen():
         self.MODE = self.MODE.fromkeys(self.MODE, 0)
         self.MODE[mode] = 1
         self.getData()
-        self.focusLineNum = self.modes[mode-1][1]
-        self.topLineNum = self.modes[mode-1][2]
+        self.focusLineNum = self.modes[mode - 1][1]
+        self.topLineNum = self.modes[mode - 1][2]
 
     def nextMode(self):
         for mode, active in self.MODE.items():
@@ -1475,9 +1477,8 @@ class Screen():
                     break
             if not found:
                 del t[i]
-                focus = self.focusLineNum
-                if self.focusLineNum >= i:
-                    self.focusLineNum = max(min(focus, focus - 1), 0)
+                if self.focusLineNum + self.topLineNum >= i:
+                    self.scroll(self.UP)
         return t
 
     def getData(self):
@@ -1499,7 +1500,6 @@ class Screen():
         self.screen.erase()
         top = self.topLineNum
         bottom = self.topLineNum + self.lines
-        gradient = [self.green, self.yellow, self.red]
         self.displayLine(0, self.menu)
 
         for index, line in enumerate(self.data[top:bottom]):
@@ -1537,11 +1537,11 @@ class Screen():
             elif line in same:
                 focusHi = curses.A_BOLD
                 if line.locked:
-                    focusHi = bracketHi = curses.A_BOLD
+                    bracketHi = curses.A_BOLD
                     arrow = '─'
 
             cols = self.cols - 32
-            if cols%3:
+            if cols % 3:
                 cols -= 1
             vol = list('-' * int(cols))
             n = int(len(vol) * line.volume[bartype] / line.maxsize)
@@ -1560,7 +1560,7 @@ class Screen():
                 line = '{:>23}{:<3}|{}\n '.format('', line.volume[bartype], focusHi)
             volbar = str()
             for i, v in enumerate(re.findall('.{{{}}}'.format(len(vol) // 3), vol)):
-                volbar += '\n{}|{}'.format(v, gradient[i] | focusHi)
+                volbar += '\n{}|{}'.format(v, self.gradient[i] | focusHi)
             line += '{:>1}|{}\n{}|{}{}\n{}|{}\n{}|{}'.format(arrow, bracketHi,
                                                              brackets[0], bracketHi,
                                                              volbar,
@@ -1573,9 +1573,7 @@ class Screen():
     def scroll(self, n):
         nextLineNum = self.focusLineNum + n
 
-        if n == self.UP and\
-                self.focusLineNum == 0 and\
-                self.topLineNum != 0:
+        if n == self.UP and self.focusLineNum == 0 and self.topLineNum != 0:
             self.topLineNum += self.UP
             return
         elif n == self.DOWN\
@@ -1584,8 +1582,7 @@ class Screen():
             self.topLineNum += self.DOWN
             return
 
-        if n == self.UP and\
-                (self.topLineNum != 0 or self.focusLineNum != 0):
+        if n == self.UP and (self.topLineNum != 0 or self.focusLineNum != 0):
             self.focusLineNum = nextLineNum
         elif n == self.DOWN and\
                 (self.topLineNum + self.focusLineNum + 1) != self.nLines and\
