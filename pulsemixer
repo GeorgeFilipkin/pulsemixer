@@ -1245,7 +1245,7 @@ class Bar():
             name = pa.description.decode()
         else:
             name = pa.client.name.decode()
-        return b64encode(bytes(name + str(pa.index) + pa.__class__.__name__, 'ascii'))
+        return b64encode(bytes(name + str(pa.index) + pa.__class__.__name__, 'utf-8'))
 
     def pollData(self, pa):
         self.channels = pa.volume.channels
