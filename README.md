@@ -41,6 +41,7 @@ And has the following controls:
   H/L, Shift+Left/Shift+Right   change volume by 10
   m                             mute/unmute
   Space                         lock/unlock channels together
+  Enter                         context menu
   F1/F2/F3/F4                   change modes
   Tab                           go to next mode
   q/Esc/^C                      quit
