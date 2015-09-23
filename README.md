@@ -24,7 +24,7 @@ Usage of pulsemixer:
   --mute                   mute ID
   --unmute                 unmute ID
 ```
-It is possible to repeat argumets:
+It is possible to repeat arguments:
 ```
 pulsemixer --get-volume --change-volume +5 --get-volume
 65 65
