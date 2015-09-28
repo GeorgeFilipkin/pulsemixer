@@ -1199,8 +1199,6 @@ class Bar():
         else:
             self.fullname = pa.client.name.decode()
         self.name = re.sub('^ALSA plug-in \[|\]$', '', self.fullname)
-        if len(self.name) > 20:
-            self.name = self.name[:20] + '..'
         self.index = pa.index
         self.channels = pa.volume.channels
         self.volume = pa.volume.values
@@ -1606,7 +1604,8 @@ class Screen():
                     self.selected[0].owner == self.data[index][0].index:
                 bracketHi = self.red | bracketHi
 
-            cols = self.cols - 32
+            off = 4 * (self.cols // 40)
+            cols = self.cols - 32 - off
             if cols % 3:
                 cols -= 1
             vol = list('-' * int(cols))
@@ -1614,16 +1613,20 @@ class Screen():
             vol[:n] = '⬛' * n
             vol = ''.join(vol)
             if bartype is Bar.LEFT:
-                line = '{:<22}|{}\n {:<3}|{}\n '.format(
-                    line.name, focusHi,
+                name = line.name
+                if len(line.name) > 20 + off:
+                    name = line.name[:20 + off] + '..'
+                line = '{:<{}}|{}\n {:<3}|{}\n '.format(
+                    name, 22 + off, focusHi,
                     line.volume[0], focusHi)
             elif bartype is Bar.RIGHT:
-                line = '{:>15}|{}\n {}|{}\n {:<3}|{}\n '.format(
-                    "Locked", self.red if line.locked else curses.A_DIM,
+                line = '{:>{}}|{}\n {}|{}\n {:<3}|{}\n '.format(
+                    "Locked", 15 + off, self.red if line.locked else curses.A_DIM,
                     "Muted ", self.red if line.muted else curses.A_DIM,
                     line.volume[bartype], focusHi)
             else:
-                line = '{:>23}{:<3}|{}\n '.format('', line.volume[bartype], focusHi)
+                line = '{:>{}}{:<3}|{}\n '.format(
+                    '', 23 + off, line.volume[bartype], focusHi)
             volbar = str()
             for i, v in enumerate(re.findall('.{{{}}}'.format(len(vol) // 3), vol)):
                 volbar += '\n{}|{}'.format(v, self.gradient[i] | focusHi)
