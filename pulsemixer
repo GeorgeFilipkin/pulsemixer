@@ -96,6 +96,14 @@ class PA_CVOLUME(Structure):
     ]
 
 
+class PA_PORT_INFO(Structure):
+    _fields_ = [
+        ('name', c_char_p),
+        ('description', c_char_p),
+        ('priority', c_uint32),
+    ]
+
+
 class PA_SINK_INPUT_INFO(Structure):
     _fields_ = [
         ("index",           c_uint32),
@@ -130,7 +138,14 @@ class PA_SINK_INFO(Structure):
         ("driver",              c_char_p),
         ("flags",               c_int),
         ("proplist",            POINTER(c_int)),
-        ("configured_latency",  PA_USEC_T)
+        ("configured_latency",  PA_USEC_T),
+        ('base_volume',         c_int),
+        ('state',               c_int),
+        ('n_volume_steps',      c_int),
+        ('card',                c_uint32),
+        ('n_ports',             c_uint32),
+        ('ports',               POINTER(POINTER(PA_PORT_INFO))),
+        ('active_port',         POINTER(PA_PORT_INFO))
     ]
 
 
@@ -172,7 +187,14 @@ class PA_SOURCE_INFO(Structure):
         ("driver",               c_char_p),
         ("flags",                c_int),
         ("proplist",             POINTER(c_int)),
-        ("configured_latency",   PA_USEC_T)
+        ("configured_latency",   PA_USEC_T),
+        ('base_volume',          c_int),
+        ('state',                c_int),
+        ('n_volume_steps',       c_int),
+        ('card',                 c_uint32),
+        ('n_ports',              c_uint32),
+        ('ports',                POINTER(POINTER(PA_PORT_INFO))),
+        ('active_port',          POINTER(PA_PORT_INFO))
     ]
 
 
@@ -375,6 +397,16 @@ pa_context_suspend_sink_by_index.argtypes = [
     POINTER(PA_CONTEXT),
     c_uint32,
     c_int,
+    PA_CONTEXT_SUCCESS_CB_T,
+    c_void_p
+]
+
+pa_context_set_sink_port_by_index = p.pa_context_set_sink_port_by_index
+pa_context_set_sink_port_by_index.restype = POINTER(c_int)
+pa_context_set_sink_port_by_index.argtypes = [
+    POINTER(PA_CONTEXT),
+    c_uint32,
+    c_char_p,
     PA_CONTEXT_SUCCESS_CB_T,
     c_void_p
 ]
@@ -595,6 +627,17 @@ pa_context_set_card_profile_by_index.argtypes = [
 # ^ bindings
 #########################################################################################
 # v lib
+
+
+class PulsePort():
+
+    def __init__(self, pa_port):
+        self.name = pa_port.name
+        self.description = pa_port.description
+        self.priority = pa_port.priority
+
+    def debug(self):
+        pprint(vars(self))
 
 
 class PulseCard():
@@ -938,6 +981,14 @@ class Pulse():
                                                           CONTEXT, None)
         self.pulse_iterate()
 
+    def pulse_set_sink_port(self, index, port):
+        self.start_action()
+        CONTEXT = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
+        self.operation = pa_context_set_sink_port_by_index(self.context,
+                                                           index, port,
+                                                           CONTEXT, None)
+        self.pulse_iterate()
+
     def pulse_set_source_output_volume(self, index, vol):
         self.start_action()
         CONTEXT = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
@@ -960,6 +1011,14 @@ class Pulse():
         self.operation = pa_context_suspend_source_by_index(self.context,
                                                             index, suspend,
                                                             CONTEXT, None)
+        self.pulse_iterate()
+
+    def pulse_set_source_port(self, index, port):
+        self.start_action()
+        CONTEXT = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
+        self.operation = pa_context_set_source_port_by_index(self.context,
+                                                           index, port,
+                                                           CONTEXT, None)
         self.pulse_iterate()
 
     def pulse_source_output_mute(self, index, mute):
@@ -1040,6 +1099,12 @@ class PulseSinkInfo(PulseSink):
         self.flags = pa_sink_info.flags
         self.proplist = pa_sink_info.proplist
         self.configured_latency = pa_sink_info.configured_latency
+        self.n_ports = pa_sink_info.n_ports
+        self.ports = [PulsePort(pa_sink_info.ports[i].contents)
+                      for i in range(self.n_ports)]
+        self.active_port = None
+        if self.n_ports:
+            self.active_port = PulsePort(pa_sink_info.active_port.contents)
 
     def debug(self):
         pprint(vars(self))
@@ -1110,6 +1175,12 @@ class PulseSourceInfo(PulseSource):
         self.flags = pa_source_info.flags
         self.proplist = pa_source_info.proplist
         self.configured_latency = pa_source_info.configured_latency
+        self.n_ports = pa_source_info.n_ports
+        self.ports = [PulsePort(pa_source_info.ports[i].contents)
+                      for i in range(self.n_ports)]
+        self.active_port = None
+        if self.n_ports:
+            self.active_port = PulsePort(pa_source_info.active_port.contents)
 
     def debug(self):
         pprint(vars(self))
@@ -1198,7 +1269,7 @@ class Bar():
             self.fullname = pa.description.decode()
         else:
             self.fullname = pa.client.name.decode()
-        self.name = re.sub('^ALSA plug-in \[|\]$', '', self.fullname)
+        self.name = re.sub('^ALSA plug-in \[|\]$', '', self.fullname.replace('|', ' '))
         self.index = pa.index
         self.channels = pa.volume.channels
         self.volume = pa.volume.values
@@ -1277,11 +1348,11 @@ class Screen():
         self.selected = None
         self.action = None
 
-    def displayLine(self, index, line):
+    def displayLine(self, index, line, mod=curses.A_NORMAL):
         shift = 0
         for s in line.split('\n'):
-            p = s.split('|')
-            self.screen.addstr(index, shift, ''.join(p[:-1]), int(p[-1]))
+            p = s.rsplit('|')
+            self.screen.addstr(index, shift, ''.join(p[:-1]), int(p[-1])|mod)
             shift += len(''.join(p[:-1]))
 
     def changeMode(self, mode):
@@ -1409,6 +1480,8 @@ class Screen():
                     self.selected = self.data[focus]
                     if self.activeMode == 3 or self.activeMode == 4:
                         self.submenuData = ['Suspend', 'Resume']
+                        if self.selected[0].pa.n_ports:
+                            self.submenuData.append('Set port')
                     else:
                         self.submenuData = ['Move']
                     self.submenuShow = True
@@ -1509,8 +1582,21 @@ class Screen():
                     pulse.pulse_sink_suspend(self.selected[2], 0)
                 else:
                     pulse.pulse_source_suspend(self.selected[2], 0)
+            elif self.action == 'Set port':
+                self.submenuData = []
+                for i in self.selected[0].pa.ports:
+                    self.submenuData.append(i.description.decode().strip('|'))
+                    if self.selected[0].pa.active_port.name == i.name:
+                        self.submenuData[-1] = " {}|{}".format(self.submenuData[-1], self.red)
+                self.focusLineNum = self.topLineNum = 0
+                return
             else:
-                pass
+                if self.activeMode == 3:
+                    pulse.pulse_set_sink_port(self.selected[0].pa.index,
+                                              self.selected[0].pa.ports[focus].name)
+                elif self.activeMode == 4:
+                    pulse.pulse_set_source_port(self.selected[0].pa.index,
+                                              self.selected[0].pa.ports[focus].name)
             self.changeModeAllowed = True
             self.submenuShow = False
             self.focusLineNum = self.modes[4][1]
@@ -1649,7 +1735,10 @@ class Screen():
                 focusHi = curses.A_BOLD
             else:
                 focusHi = curses.A_NORMAL
-            self.submenu.addstr(index, 1, line, focusHi)
+            if '|' in line:
+                self.displayLine(index, line, focusHi)
+            else:
+                self.submenu.addstr(index, 1, line, focusHi)
         self.submenu.refresh()
 
     def scroll(self, n):
