@@ -580,6 +580,7 @@ pa_context_get_client_info_list.argtypes = [
     PA_CLIENT_INFO_CB_T,
     c_void_p
 ]
+
 pa_context_get_client_info = p.pa_context_get_client_info
 pa_context_get_client_info.restype = POINTER(c_int)
 pa_context_get_client_info.argtypes = [
@@ -595,7 +596,6 @@ pa_operation_unref.argtypes = [
     POINTER(PA_OPERATION)
 ]
 
-
 pa_context_get_card_info_by_index = p.pa_context_get_card_info_by_index
 pa_context_get_card_info_by_index.restype = POINTER(PA_OPERATION)
 pa_context_get_card_info_by_index.argtypes = [
@@ -604,7 +604,6 @@ pa_context_get_card_info_by_index.argtypes = [
     PA_CARD_INFO_CB_T,
     c_void_p
 ]
-
 
 pa_context_get_card_info_list = p.pa_context_get_card_info_list
 pa_context_get_card_info_list.restype = POINTER(PA_OPERATION)
@@ -691,7 +690,7 @@ class PulseClientC(PulseClient):
 
 class Pulse():
 
-    def __init__(self, clientName=None, server=None, retry=False):
+    def __init__(self, client_name=None, server=None, retry=False):
         self.server = server
         self.ret = None
         self.retry = retry
@@ -702,7 +701,7 @@ class Pulse():
         self.data = None
         self.mainloop = None
         self.mainloop_api = None
-        self.clientName = (clientName or 'libpulse').encode()
+        self.client_name = (client_name or 'libpulse').encode()
 
         self.pa_signal_cb = PA_SIGNAL_CB_T(self.signal_cb)
         self.pa_state_cb = PA_STATE_CB_T(self.state_cb)
@@ -716,7 +715,7 @@ class Pulse():
         pa_signal_new(2, self.pa_signal_cb, None)
         pa_signal_new(15, self.pa_signal_cb, None)
 
-        self.context = pa_context_new(self.mainloop_api, self.clientName)
+        self.context = pa_context_new(self.mainloop_api, self.client_name)
         pa_context_set_state_callback(self.context, self.pa_state_cb, None)
         self.start_action()
 
@@ -727,7 +726,7 @@ class Pulse():
             self.pulse_context_error()
         self.pulse_iterate()
 
-    def unmuteStream(self, obj):
+    def unmute_stream(self, obj):
         if type(obj) is PulseSinkInfo:
             self.pulse_sink_mute(obj.index, 0)
         elif type(obj) is PulseSinkInputInfo:
@@ -740,7 +739,7 @@ class Pulse():
             raise NotImplementedError(type(obj))
         obj.mute = 0
 
-    def muteStream(self, obj):
+    def mute_stream(self, obj):
         if type(obj) is PulseSinkInfo:
             self.pulse_sink_mute(obj.index, 1)
         elif type(obj) is PulseSinkInputInfo:
@@ -753,7 +752,7 @@ class Pulse():
             raise NotImplementedError(type(obj))
         obj.mute = 1
 
-    def setVolume(self, obj, volume):
+    def set_volume(self, obj, volume):
         if type(obj) is PulseSinkInfo:
             self.pulse_set_sink_volume(obj.index, volume)
         elif type(obj) is PulseSinkInputInfo:
@@ -766,11 +765,11 @@ class Pulse():
             raise NotImplementedError(type(obj))
         obj.volume = volume
 
-    def changeVolumeMono(self, obj, inc):
+    def change_volume_mono(self, obj, inc):
         obj.volume.values = [v + inc for v in obj.volume.values]
-        self.setVolume(obj, obj.volume)
+        self.set_volume(obj, obj.volume)
 
-    def getVolumeMono(self, obj):
+    def get_volume_mono(self, obj):
         return int(sum(obj.volume.values) / len(obj.volume.values))
 
     def fill_clients(self):
@@ -910,8 +909,7 @@ class Pulse():
     def pulse_source_list(self):
         self.start_action()
         CB = PA_SOURCE_INFO_CB_T(self.source_cb)
-        self.operation = pa_context_get_source_info_list(self.context,
-                                                         CB, None)
+        self.operation = pa_context_get_source_info_list(self.context, CB, None)
         self.pulse_iterate()
         data, self.data = self.data, None
         return data or []
@@ -927,8 +925,7 @@ class Pulse():
     def pulse_client_list(self):
         self.start_action()
         CB = PA_CLIENT_INFO_CB_T(self.client_cb)
-        self.operation = pa_context_get_client_info_list(self.context,
-                                                         CB, None)
+        self.operation = pa_context_get_client_info_list(self.context, CB, None)
         self.pulse_iterate()
         data, self.data = self.data, None
         return data or []
@@ -961,7 +958,7 @@ class Pulse():
         self.start_action()
         CONTEXT = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
         self.operation = pa_context_set_sink_input_volume(self.context,
-                                                          index, vol.toC(),
+                                                          index, vol.to_c(),
                                                           CONTEXT, None)
         self.pulse_iterate()
 
@@ -969,7 +966,7 @@ class Pulse():
         self.start_action()
         CONTEXT = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
         self.operation = pa_context_set_sink_volume_by_index(self.context,
-                                                             index, vol.toC(),
+                                                             index, vol.to_c(),
                                                              CONTEXT, None)
         self.pulse_iterate()
 
@@ -993,7 +990,7 @@ class Pulse():
         self.start_action()
         CONTEXT = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
         self.operation = pa_context_set_source_output_volume(self.context,
-                                                             index, vol.toC(),
+                                                             index, vol.to_c(),
                                                              CONTEXT, None)
         self.pulse_iterate()
 
@@ -1001,7 +998,7 @@ class Pulse():
         self.start_action()
         CONTEXT = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
         self.operation = pa_context_set_source_volume_by_index(self.context,
-                                                               index, vol.toC(),
+                                                               index, vol.to_c(),
                                                                CONTEXT, None)
         self.pulse_iterate()
 
@@ -1017,8 +1014,8 @@ class Pulse():
         self.start_action()
         CONTEXT = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
         self.operation = pa_context_set_source_port_by_index(self.context,
-                                                           index, port,
-                                                           CONTEXT, None)
+                                                             index, port,
+                                                             CONTEXT, None)
         self.pulse_iterate()
 
     def pulse_source_output_mute(self, index, mute):
@@ -1046,7 +1043,7 @@ class Pulse():
         self.pulse_iterate()
 
     def reconnect(self):
-        self.context = pa_context_new(self.mainloop_api, self.clientName)
+        self.context = pa_context_new(self.mainloop_api, self.client_name)
         pa_context_set_state_callback(self.context, self.pa_state_cb, None)
         self.start_action()
         if pa_context_connect(self.context, self.server, 0, None) < 0:
@@ -1226,7 +1223,7 @@ class PulseVolume():
         self.channels = channels
         self.values = [values] * self.channels
 
-    def toC(self):
+    def to_c(self):
         self.values = list(map(lambda x: max(min(x, 150), 0), self.values))
         cvolume = PA_CVOLUME()
         cvolume.channels = self.channels
@@ -1279,7 +1276,7 @@ class Bar():
         self.pa = pa
         self.owner = 0
 
-    def pollData(self, pa):
+    def poll_data(self, pa):
         self.channels = pa.volume.channels
         self.volume = pa.volume.values
         self.muted = pa.mute
@@ -1290,13 +1287,13 @@ class Bar():
         elif type(pa) is PulseSinkInputInfo:
             self.owner = pa.sink
 
-    def muteToggle(self):
+    def mute_toggle(self):
         if self.muted:
-            pulse.unmuteStream(self.pa)
+            pulse.unmute_stream(self.pa)
         else:
-            pulse.muteStream(self.pa)
+            pulse.mute_stream(self.pa)
 
-    def lockToggle(self):
+    def lock_toggle(self):
         self.locked = not self.locked
 
     def move(self, n, side):
@@ -1306,7 +1303,7 @@ class Bar():
                 vol.values[i] += n
         else:
             vol.values[side] += n
-        pulse.setVolume(self.pa, vol)
+        pulse.set_volume(self.pa, vol)
 
 
 class Screen():
@@ -1323,16 +1320,16 @@ class Screen():
         curses.curs_set(0)
         self.screen.border(0)
         self.index = 0
-        self.topLineNum = 0
-        self.focusLineNum = 0
+        self.top_line_num = 0
+        self.focus_line_num = 0
         self.lines, self.cols = curses.LINES - 1, curses.COLS
         self.info, self.menu = str, str
         self.data = []
         self.modes = [[[], 0, 0] for i in range(5)]
-        self.activeMode = 1
-        self.oldMode = 1
-        self.changeModeAllowed = True
-        self.nLines = 0
+        self.active_mode = 1
+        self.old_mode = 1
+        self.change_mode_allowed = True
+        self.n_lines = 0
         curses.start_color()
         curses.use_default_colors()
         curses.init_pair(1, curses.COLOR_GREEN, -1)
@@ -1342,40 +1339,40 @@ class Screen():
         self.yellow = curses.color_pair(2)
         self.red = curses.color_pair(3)
         self.gradient = [self.green, self.yellow, self.red]
-        self.submenuData = []
-        self.submenuShow = False
+        self.submenu_data = []
+        self.submenu_show = False
         self.submenu = curses.newwin(curses.LINES, 25, 0, 0)
         self.selected = None
         self.action = None
 
-    def displayLine(self, index, line, mod=curses.A_NORMAL):
+    def display_line(self, index, line, mod=curses.A_NORMAL):
         shift = 0
         for s in line.split('\n'):
             p = s.rsplit('|')
-            self.screen.addstr(index, shift, ''.join(p[:-1]), int(p[-1])|mod)
+            self.screen.addstr(index, shift, ''.join(p[:-1]), int(p[-1]) | mod)
             shift += len(''.join(p[:-1]))
 
-    def changeMode(self, mode):
-        if not self.changeModeAllowed:
+    def change_mode(self, mode):
+        if not self.change_mode_allowed:
             return
-        self.modes[self.activeMode - 1][1] = self.focusLineNum
-        self.modes[self.activeMode - 1][2] = self.topLineNum
-        self.oldMode = self.activeMode
+        self.modes[self.active_mode - 1][1] = self.focus_line_num
+        self.modes[self.active_mode - 1][2] = self.top_line_num
+        self.old_mode = self.active_mode
         self.MODE = self.MODE.fromkeys(self.MODE, 0)
         self.MODE[mode] = 1
-        self.getData()
-        self.focusLineNum = self.modes[mode - 1][1]
-        self.topLineNum = self.modes[mode - 1][2]
-        self.activeMode = mode
+        self.get_data()
+        self.focus_line_num = self.modes[mode - 1][1]
+        self.top_line_num = self.modes[mode - 1][2]
+        self.active_mode = mode
 
-    def nextMode(self):
+    def next_mode(self):
         for mode, active in self.MODE.items():
             if active == 1:
-                self.changeMode(1 + (mode % len(self.MODE)))
+                self.change_mode(1 + (mode % len(self.MODE)))
                 return
 
-    def updateMenu(self):
-        if self.changeModeAllowed:
+    def update_menu(self):
+        if self.change_mode_allowed:
             self.menu = '{}|{}\n  {}|{}\n  {}|{}\n  {}|{}'.format(
                 "F1 Playback", curses.A_BOLD if self.MODE[1] else curses.A_DIM,
                 "F2 Recording", curses.A_BOLD if self.MODE[2] else curses.A_DIM,
@@ -1388,12 +1385,12 @@ class Screen():
                 select = 'input'
             self.menu = "Select new {} device:|{}".format(select, curses.A_NORMAL)
 
-    def updateInfo(self):
-        focus = self.focusLineNum + self.topLineNum + 1
+    def update_info(self):
+        focus = self.focus_line_num + self.top_line_num + 1
         try:
             bar, side = self.data[focus - 1][0], self.data[focus - 1][1]
         except IndexError:
-            self.focusLineNum, self.topLineNum = 0, 0
+            self.focus_line_num, self.top_line_num = 0, 0
             for _ in range(len(self.data)):
                 self.scroll(self.UP)
             return
@@ -1426,7 +1423,7 @@ class Screen():
                 side = 'Side Left'
             elif side is Bar.SRIGHT:
                 side = 'Side Right'
-        self.info = '{:<7}|{}'.format(n + '/' + str(self.nLines), curses.A_BOLD)
+        self.info = '{:<7}|{}'.format(n + '/' + str(self.n_lines), curses.A_BOLD)
         name = '{}: {}'.format(bar.fullname, side)
         if len(name) > self.cols - 14:
             name = '{}: {}'.format(bar.fullname[:self.cols - (18 + len(side))], side)
@@ -1435,9 +1432,8 @@ class Screen():
             "M  ", self.red if bar.muted else curses.A_DIM,
             name, curses.A_NORMAL)
 
-    def checkResize(self):
-        resize = curses.is_term_resized(curses.LINES, curses.COLS)
-        if resize:
+    def check_resize(self):
+        if curses.is_term_resized(curses.LINES, curses.COLS):
             y, x = self.screen.getmaxyx()
             curses.resizeterm(y, x)
             self.submenu.resize(curses.LINES, 25)
@@ -1448,72 +1444,72 @@ class Screen():
         signal.signal(signal.SIGINT, lambda signal, frame: sys.exit(0))
         while True:
             try:
-                self.checkResize()
-                if not self.submenuShow:
-                    self.getData()
-                    self.updateMenu()
-                    self.updateInfo()
+                self.check_resize()
+                if not self.submenu_show:
+                    self.get_data()
+                    self.update_menu()
+                    self.update_info()
                     self.display()
-                elif self.changeModeAllowed:
-                    self.displaySubmenu()
-                    self.runSubmenu()
+                elif self.change_mode_allowed:
+                    self.display_submenu()
+                    self.run_submenu()
                     continue
             except curses.error as e:
                 self.screen.erase()
                 self.screen.addstr('Can you make it any bigger?\n')
                 self.screen.addstr(str(e))
 
-            focus = self.topLineNum + self.focusLineNum
+            focus = self.top_line_num + self.focus_line_num
             bar, side = self.data[focus][0], self.data[focus][1]
 
             c = self.screen.getch()
             if c == curses.KEY_F1:
-                self.changeMode(1)
+                self.change_mode(1)
             elif c == curses.KEY_F2:
-                self.changeMode(2)
+                self.change_mode(2)
             elif c == curses.KEY_F3:
-                self.changeMode(3)
+                self.change_mode(3)
             elif c == curses.KEY_F4:
-                self.changeMode(4)
+                self.change_mode(4)
             elif c == ord('\n'):
-                if not self.submenuShow and self.changeModeAllowed and side != Bar.NONE:
+                if not self.submenu_show and self.change_mode_allowed and side != Bar.NONE:
                     self.selected = self.data[focus]
-                    if self.activeMode == 3 or self.activeMode == 4:
-                        self.submenuData = ['Suspend', 'Resume']
+                    if self.active_mode == 3 or self.active_mode == 4:
+                        self.submenu_data = ['Suspend', 'Resume']
                         if self.selected[0].pa.n_ports:
-                            self.submenuData.append('Set port')
+                            self.submenu_data.append('Set port')
                     else:
-                        self.submenuData = ['Move']
-                    self.submenuShow = True
+                        self.submenu_data = ['Move']
+                    self.submenu_show = True
                     self.modes[4][0] = 0
-                    self.modes[4][1] = self.focusLineNum
-                    self.modes[4][2] = self.topLineNum
-                    self.focusLineNum = self.topLineNum = 0
-                    self.nLines = len(self.submenuData)
-                elif not self.changeModeAllowed:
-                    self.submenuShow = False
-                    self.changeModeAllowed = True
+                    self.modes[4][1] = self.focus_line_num
+                    self.modes[4][2] = self.top_line_num
+                    self.focus_line_num = self.top_line_num = 0
+                    self.n_lines = len(self.submenu_data)
+                elif not self.change_mode_allowed:
+                    self.submenu_show = False
+                    self.change_mode_allowed = True
                     if self.action == 'Move':
-                        if self.oldMode == 1:
+                        if self.old_mode == 1:
                             pulse.pulse_sink_input_move(self.selected[0].index,
                                                         self.data[focus][0].pa.index)
                         else:
                             pulse.pulse_source_output_move(self.selected[0].index,
                                                            self.data[focus][0].pa.index)
-                        self.changeMode(self.oldMode)
-                        self.focusLineNum = self.modes[4][1]
-                        self.topLineNum = self.modes[4][2]
+                        self.change_mode(self.old_mode)
+                        self.focus_line_num = self.modes[4][1]
+                        self.top_line_num = self.modes[4][2]
                     else:
-                        self.changeMode(self.oldMode)
+                        self.change_mode(self.old_mode)
             elif c == ord('\t'):
-                self.nextMode()
+                self.next_mode()
             elif c == ord('q') or c == self.ESC_KEY:
-                if not self.changeModeAllowed:
-                    self.submenuShow = False
-                    self.changeModeAllowed = True
-                    self.changeMode(self.oldMode)
-                    self.focusLineNum = self.modes[4][1]
-                    self.topLineNum = self.modes[4][2]
+                if not self.change_mode_allowed:
+                    self.submenu_show = False
+                    self.change_mode_allowed = True
+                    self.change_mode(self.old_mode)
+                    self.focus_line_num = self.modes[4][1]
+                    self.top_line_num = self.modes[4][2]
                 else:
                     return
 
@@ -1540,9 +1536,9 @@ class Screen():
                     self.scroll(self.DOWN)
 
             elif c == ord('m'):
-                bar.muteToggle()
+                bar.mute_toggle()
             elif c == self.SPACE_KEY:
-                bar.lockToggle()
+                bar.lock_toggle()
             elif c == curses.KEY_LEFT or c == ord('h'):
                 bar.move(-1, side)
             elif c == curses.KEY_RIGHT or c == ord('l'):
@@ -1552,55 +1548,55 @@ class Screen():
             elif c == curses.KEY_SRIGHT or c == ord('L'):
                 bar.move(10, side)
 
-    def runSubmenu(self):
+    def run_submenu(self):
         c = self.screen.getch()
         if c == ord('q') or c == self.ESC_KEY:
-            self.submenuShow = False
-            self.focusLineNum = self.modes[4][1]
-            self.topLineNum = self.modes[4][2]
+            self.submenu_show = False
+            self.focus_line_num = self.modes[4][1]
+            self.top_line_num = self.modes[4][2]
         elif c == curses.KEY_UP or c == ord('k'):
             self.scroll(self.UP)
         elif c == curses.KEY_DOWN or c == ord('j'):
             self.scroll(self.DOWN)
         elif c == ord('\n'):
-            focus = self.focusLineNum + self.topLineNum
-            self.action = self.submenuData[focus]
+            focus = self.focus_line_num + self.top_line_num
+            self.action = self.submenu_data[focus]
             if self.action == 'Move':
-                if self.activeMode == 1:
-                    self.changeMode(3)
-                elif self.activeMode == 2:
-                    self.changeMode(4)
-                self.changeModeAllowed = self.submenuShow = False
+                if self.active_mode == 1:
+                    self.change_mode(3)
+                elif self.active_mode == 2:
+                    self.change_mode(4)
+                self.change_mode_allowed = self.submenu_show = False
                 return
             elif self.action == 'Suspend':
-                if self.activeMode == 3:
+                if self.active_mode == 3:
                     pulse.pulse_sink_suspend(self.selected[2], 1)
                 else:
                     pulse.pulse_source_suspend(self.selected[2], 1)
             elif self.action == 'Resume':
-                if self.activeMode == 3:
+                if self.active_mode == 3:
                     pulse.pulse_sink_suspend(self.selected[2], 0)
                 else:
                     pulse.pulse_source_suspend(self.selected[2], 0)
             elif self.action == 'Set port':
-                self.submenuData = []
+                self.submenu_data = []
                 for i in self.selected[0].pa.ports:
-                    self.submenuData.append(i.description.decode().strip('|'))
+                    self.submenu_data.append(i.description.decode().strip('|'))
                     if self.selected[0].pa.active_port.name == i.name:
-                        self.submenuData[-1] = " {}|{}".format(self.submenuData[-1], self.red)
-                self.focusLineNum = self.topLineNum = 0
+                        self.submenu_data[-1] = " {}|{}".format(self.submenu_data[-1], self.red)
+                self.focus_line_num = self.top_line_num = 0
                 return
             else:
-                if self.activeMode == 3:
+                if self.active_mode == 3:
                     pulse.pulse_set_sink_port(self.selected[0].pa.index,
                                               self.selected[0].pa.ports[focus].name)
-                elif self.activeMode == 4:
+                elif self.active_mode == 4:
                     pulse.pulse_set_source_port(self.selected[0].pa.index,
-                                              self.selected[0].pa.ports[focus].name)
-            self.changeModeAllowed = True
-            self.submenuShow = False
-            self.focusLineNum = self.modes[4][1]
-            self.topLineNum = self.modes[4][2]
+                                                self.selected[0].pa.ports[focus].name)
+            self.change_mode_allowed = True
+            self.submenu_show = False
+            self.focus_line_num = self.modes[4][1]
+            self.top_line_num = self.modes[4][2]
 
     def fill(self, t, f):
         for s in f:
@@ -1608,7 +1604,7 @@ class Screen():
             for i, data in enumerate(t):
                 if s.index == data[2]:
                     found = True
-                    data[0].pollData(s)
+                    data[0].poll_data(s)
             if not found:
                 bar = Bar(s)
                 for c in range(s.volume.channels):
@@ -1622,11 +1618,11 @@ class Screen():
                     break
             if not found:
                 del t[i]
-                if self.focusLineNum + self.topLineNum >= i:
+                if self.focus_line_num + self.top_line_num >= i:
                     self.scroll(self.UP)
         return t
 
-    def getData(self):
+    def get_data(self):
         if self.MODE[1]:
             self.data = self.fill(self.modes[0][0], pulse.pulse_sink_input_list())
         elif self.MODE[2]:
@@ -1636,29 +1632,28 @@ class Screen():
         elif self.MODE[4]:
             self.data = self.fill(self.modes[3][0], pulse.pulse_source_list())
 
-        self.nLines = len(self.data)
-        if not self.nLines:
-            self.focusLineNum = 0
+        self.n_lines = len(self.data)
+        if not self.n_lines:
+            self.focus_line_num = 0
             self.data.append((Bar('no data'), Bar.NONE, 0))
 
     def display(self):
         self.screen.erase()
-        top = self.topLineNum
-        bottom = self.topLineNum + self.lines
-        self.displayLine(0, self.menu)
+        top = self.top_line_num
+        bottom = self.top_line_num + self.lines
+        self.display_line(0, self.menu)
 
         for index, line in enumerate(self.data[top:bottom]):
             line, bartype = line[0], line[1]
-            linenum = self.topLineNum + index
+            linenum = self.top_line_num + index
             if bartype is Bar.NONE:
-                self.screen.addstr(
-                    self.lines // 2, self.cols // 2, line.name, curses.A_DIM)
+                self.screen.addstr(self.lines // 2, self.cols // 2, line.name, curses.A_DIM)
                 break
 
             # hightlight lines from same bar
             same, found = [], False
             for i, v in enumerate(self.data[:]):
-                if v[0] is self.data[self.topLineNum + self.focusLineNum][0]:
+                if v[0] is self.data[self.top_line_num + self.focus_line_num][0]:
                     same.append(v[0])
                     found = True
                 elif found:
@@ -1675,22 +1670,22 @@ class Screen():
                 brackets = ['├', '┤']
 
             # focus current lines
-            focusHi, bracketHi, arrow = 0, 0, ''
-            if index == self.focusLineNum:
-                focusHi = bracketHi = curses.A_BOLD
+            focus_hi, bracket_hi, arrow = 0, 0, ''
+            if index == self.focus_line_num:
+                focus_hi = bracket_hi = curses.A_BOLD
                 arrow = '─'
             elif line in same:
-                focusHi = curses.A_BOLD
+                focus_hi = curses.A_BOLD
                 if line.locked:
-                    bracketHi = curses.A_BOLD
+                    bracket_hi = curses.A_BOLD
                     arrow = '─'
 
             # highlight chosen sink/source
-            if not self.changeModeAllowed and \
+            if not self.change_mode_allowed and \
                     self.selected[0].owner == self.data[index][0].index:
-                bracketHi = self.red | bracketHi
+                bracket_hi = self.red | bracket_hi
 
-            off = 4 * (self.cols // 40)
+            off = 5 * (self.cols // 40)
             cols = self.cols - 32 - off
             if cols % 3:
                 cols -= 1
@@ -1703,62 +1698,62 @@ class Screen():
                 if len(line.name) > 20 + off:
                     name = line.name[:20 + off] + '..'
                 line = '{:<{}}|{}\n {:<3}|{}\n '.format(
-                    name, 22 + off, focusHi,
-                    line.volume[0], focusHi)
+                    name, 22 + off, focus_hi,
+                    line.volume[0], focus_hi)
             elif bartype is Bar.RIGHT:
                 line = '{:>{}}|{}\n {}|{}\n {:<3}|{}\n '.format(
                     "Locked", 15 + off, self.red if line.locked else curses.A_DIM,
                     "Muted ", self.red if line.muted else curses.A_DIM,
-                    line.volume[bartype], focusHi)
+                    line.volume[bartype], focus_hi)
             else:
                 line = '{:>{}}{:<3}|{}\n '.format(
-                    '', 23 + off, line.volume[bartype], focusHi)
+                    '', 23 + off, line.volume[bartype], focus_hi)
             volbar = str()
             for i, v in enumerate(re.findall('.{{{}}}'.format(len(vol) // 3), vol)):
-                volbar += '\n{}|{}'.format(v, self.gradient[i] | focusHi)
+                volbar += '\n{}|{}'.format(v, self.gradient[i] | focus_hi)
             line += '{:>1}|{}\n{}|{}{}\n{}|{}\n{}|{}'.format(arrow, curses.A_BOLD,
-                                                             brackets[0], bracketHi,
+                                                             brackets[0], bracket_hi,
                                                              volbar,
-                                                             brackets[1], bracketHi,
+                                                             brackets[1], bracket_hi,
                                                              arrow, curses.A_BOLD)
-            self.displayLine(index + 1, line)
-        self.displayLine(self.lines + 1, self.info)
+            self.display_line(index + 1, line)
+        self.display_line(self.lines + 1, self.info)
         self.screen.refresh()
 
-    def displaySubmenu(self):
+    def display_submenu(self):
         self.submenu.erase()
-        top = self.topLineNum
-        bottom = self.topLineNum + self.lines + 2
+        top = self.top_line_num
+        bottom = self.top_line_num + self.lines + 2
         self.submenu.vline(0, 24, curses.ACS_VLINE, self.lines + 2)
-        for index, line in enumerate(self.submenuData[top:bottom]):
-            if index == self.focusLineNum:
-                focusHi = curses.A_BOLD
+        for index, line in enumerate(self.submenu_data[top:bottom]):
+            if index == self.focus_line_num:
+                focus_hi = curses.A_BOLD
             else:
-                focusHi = curses.A_NORMAL
+                focus_hi = curses.A_NORMAL
             if '|' in line:
-                self.displayLine(index, line, focusHi)
+                self.display_line(index, line, focus_hi)
             else:
-                self.submenu.addstr(index, 1, line, focusHi)
+                self.submenu.addstr(index, 1, line, focus_hi)
         self.submenu.refresh()
 
     def scroll(self, n):
-        nextLineNum = self.focusLineNum + n
+        next_line_num = self.focus_line_num + n
 
-        if n == self.UP and self.focusLineNum == 0 and self.topLineNum != 0:
-            self.topLineNum += self.UP
+        if n == self.UP and self.focus_line_num == 0 and self.top_line_num != 0:
+            self.top_line_num += self.UP
             return
         elif n == self.DOWN\
-                and nextLineNum == self.lines and\
-                (self.topLineNum + self.lines) != self.nLines:
-            self.topLineNum += self.DOWN
+                and next_line_num == self.lines and\
+                (self.top_line_num + self.lines) != self.n_lines:
+            self.top_line_num += self.DOWN
             return
 
-        if n == self.UP and (self.topLineNum != 0 or self.focusLineNum != 0):
-            self.focusLineNum = nextLineNum
+        if n == self.UP and (self.top_line_num != 0 or self.focus_line_num != 0):
+            self.focus_line_num = next_line_num
         elif n == self.DOWN and\
-                (self.topLineNum + self.focusLineNum + 1) != self.nLines and\
-                self.focusLineNum != self.lines:
-            self.focusLineNum = nextLineNum
+                (self.top_line_num + self.focus_line_num + 1) != self.n_lines and\
+                self.focus_line_num != self.lines:
+            self.focus_line_num = next_line_num
 
 
 def usage():
@@ -1783,10 +1778,10 @@ def main():
         index = sinks[0].index
     except:
         sys.exit("ERR: Can't find master sink")
-    for i in sources + source_outputs + sink_inputs + sinks:
+    for i in source_outputs + sources + sink_inputs + sinks:
         streams[i.index] = i
-    checkId = lambda x: x in streams or sys.exit('ERR: No such ID: ' + str(x))
-    checkId(index)
+    check_id = lambda x: x in streams or sys.exit('ERR: No such ID: ' + str(x))
+    check_id(index)
 
     if len(sys.argv) == 1:
         scr = Screen()
@@ -1798,12 +1793,13 @@ def main():
 
         elif opt == '--id':
             index = int(arg)
+            check_id(index)
 
         elif opt in ('-l', '--list'):
             for sink in sink_inputs:
-                print("Sink_input:\t", sink)
+                print("Sink input:\t", sink)
             for source in source_outputs:
-                print("Source_output:\t", source)
+                print("Source output:\t", source)
             for sink in sinks:
                 print("Sink:\t\t", sink)
             for source in sources:
@@ -1811,13 +1807,13 @@ def main():
 
         elif opt == '--list-sinks':
             for sink in sink_inputs:
-                print("Sink_input:\t", sink)
+                print("Sink input:\t", sink)
             for sink in sinks:
                 print("Sink:\t\t", sink)
 
         elif opt == '--list-sources':
             for source in source_outputs:
-                print("Source_output:\t", source)
+                print("Source output:\t", source)
             for source in sources:
                 print("Source:\t\t", source)
 
@@ -1825,16 +1821,16 @@ def main():
             print(streams[index].mute)
 
         elif opt == '--mute':
-            pulse.muteStream(streams[index])
+            pulse.mute_stream(streams[index])
 
         elif opt == '--unmute':
-            pulse.unmuteStream(streams[index])
+            pulse.unmute_stream(streams[index])
 
         elif opt == '--toggle-mute':
             if streams[index].mute:
-                pulse.unmuteStream(streams[index])
+                pulse.unmute_stream(streams[index])
             else:
-                pulse.muteStream(streams[index])
+                pulse.mute_stream(streams[index])
 
         elif opt == '--get-volume':
             print(*streams[index].volume.values)
@@ -1843,7 +1839,7 @@ def main():
             vol = streams[index].volume
             for i, _ in enumerate(vol.values):
                 vol.values[i] = int(arg)
-            pulse.setVolume(streams[index], vol)
+            pulse.set_volume(streams[index], vol)
 
         elif opt == '--set-volume-all':
             vol = streams[index].volume
@@ -1853,13 +1849,13 @@ def main():
                          "in the stream")
             for i, _ in enumerate(vol.values):
                 vol.values[i] = int(arg[i])
-            pulse.setVolume(streams[index], vol)
+            pulse.set_volume(streams[index], vol)
 
         elif opt == '--change-volume':
             vol = streams[index].volume
             for i, _ in enumerate(vol.values):
                 vol.values[i] += int(arg)
-            pulse.setVolume(streams[index], vol)
+            pulse.set_volume(streams[index], vol)
 
 
 if __name__ == '__main__':
