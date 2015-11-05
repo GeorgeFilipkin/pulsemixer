@@ -2,6 +2,7 @@
 '''
 Usage of pulsemixer:
   -h, --help               show this help message and exit
+  -v, --version            print version
   -l, --list               list everything
   --list-sources           list sources
   --list-sinks             list sinks
@@ -16,6 +17,7 @@ Usage of pulsemixer:
   --unmute                 unmute ID
 '''
 
+VERSION = '1.0.0'
 
 from ctypes import *
 import sys
@@ -1767,7 +1769,7 @@ def main():
     try:
         opts, args = getopt.getopt(
             sys.argv[1:], "hvl",
-            ["help", "list", "list-sinks", "list-sources", "id=",
+            ["help", "version", "list", "list-sinks", "list-sources", "id=",
              "set-volume=", "set-volume-all=", "change-volume=", "get-volume",
              "get-mute", "toggle-mute", "mute", "unmute"])
     except getopt.GetoptError as err:
@@ -1794,6 +1796,9 @@ def main():
     for opt, arg in opts:
         if opt in ('-h', '--help'):
             sys.exit(usage())
+
+        if opt in ('-v', '--version'):
+            sys.exit(print(VERSION))
 
         elif opt == '--id':
             index = int(arg)
