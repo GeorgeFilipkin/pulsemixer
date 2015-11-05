@@ -11,6 +11,7 @@ No dbus, no additional pulseaudio configuration is required.
 ```
 Usage of pulsemixer:
   -h, --help               show this help message and exit
+  -v, --version            print version
   -l, --list               list everything
   --list-sources           list sources
   --list-sinks             list sinks
@@ -44,6 +45,7 @@ And has the following controls:
   Enter                         context menu
   F1/F2/F3/F4                   change modes
   Tab                           go to next mode
+  ?                             show help
   q/Esc/^C                      quit
 ```
 
