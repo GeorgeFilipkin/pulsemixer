@@ -304,7 +304,7 @@ pa_mainloop_dispatch = p.pa_mainloop_dispatch
 pa_mainloop_dispatch.restype = c_int
 pa_mainloop_dispatch.argtypes = [POINTER(PA_MAINLOOP)]
 
-pa_mainloop_free = p.pa_mainloop_run
+pa_mainloop_free = p.pa_mainloop_free
 pa_mainloop_free.restype = c_int
 pa_mainloop_free.argtypes = [POINTER(PA_MAINLOOP)]
 
