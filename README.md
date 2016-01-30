@@ -43,7 +43,7 @@ And has the following controls:
   m                             mute/unmute
   Space                         lock/unlock channels together
   Enter                         context menu
-  F1/F2/F3/F4                   change modes
+  F1/F2                         change modes
   Tab                           go to next mode
   ?                             show help
   q/Esc/^C                      quit
