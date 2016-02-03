@@ -1592,29 +1592,29 @@ class Screen():
                     same.append(v[0])
                     found = True
 
-            tree = ''
+            tree = ' '
             if bar.owner == -1 and bar.owned > bar.channels:
-                tree = '│'
+                tree = ' │'
             if bar.owner != -1:
-                tree = '│'
+                tree = ' │'
             if bartype == Bar.LEFT:
                 if bar.owner == -1:
-                    tree = ''
+                    tree = ' '
                 if bar.owner != -1:
-                    tree = '├──'
+                    tree = ' ├──'
                     if bar.stream_index == bar.owned:
-                        tree = '└──'
+                        tree = ' └──'
                 if bar.channels != 1:
                     brackets = ['┌', '┐']
                 else:
                     brackets = ['╶', '╴']
             elif bartype == bar.channels - 1:
                 if bar.stream_index == bar.owned:
-                    tree = ''
+                    tree = ' '
                 brackets = ['└', '┘']
             else:
                 if bar.stream_index == bar.owned:
-                    tree = ''
+                    tree = ' '
                 brackets = ['├', '┤']
 
             # focus current lines
@@ -1642,6 +1642,8 @@ class Screen():
             vol[:n] = '⬛' * n
             vol = ''.join(vol)
             if bartype is Bar.LEFT:
+                if bar.pa.name in (self.server.default_sink_name, self.server.default_source_name):
+                    tree = '✓'
                 name = bar.name
                 if len(bar.name) > 20 + off:
                     name = bar.name[:20 + off] + '..'
