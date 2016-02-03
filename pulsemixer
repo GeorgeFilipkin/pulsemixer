@@ -6,7 +6,7 @@ Usage of pulsemixer:
   -l, --list               list everything
   --list-sources           list sources
   --list-sinks             list sinks
-  --id ID                  specify ID. If no ID specified - master sink is used
+  --id ID                  specify ID. If no ID specified - default sink is used
   --set-volume n           set volume for ID
   --set-volume-all n:n     set volume for ID (for every channel)
   --change-volume +-n      change volume for ID
@@ -220,6 +220,17 @@ class PA_CARD_INFO(Structure):
         ('proplist', POINTER(c_int)),
     ]
 
+class PA_SERVER_INFO(Structure):
+    _fields_ = [
+        ('user_name', c_char_p),
+        ('host_name', c_char_p),
+        ('server_version', c_char_p),
+        ('server_name', c_char_p),
+        ('sample_spec', PA_SAMPLE_SPEC),
+        ('default_sink_name', c_char_p),
+        ('default_source_name', c_char_p),
+    ]
+
 PA_STATE_CB_T = CFUNCTYPE(c_int, POINTER(PA_CONTEXT), c_void_p)
 
 PA_SIGNAL_CB_T = CFUNCTYPE(c_void_p,
@@ -273,6 +284,10 @@ PA_CARD_INFO_CB_T = CFUNCTYPE(None,
                               c_int,
                               c_void_p)
 
+PA_SERVER_INFO_CB_T = CFUNCTYPE(None,
+                                POINTER(PA_CONTEXT),
+                                POINTER(PA_SERVER_INFO),
+                                c_void_p)
 pa_strerror = p.pa_strerror
 pa_strerror.restype = c_char_p
 pa_strerror.argtypes = [c_int]
@@ -440,6 +455,15 @@ pa_context_move_sink_input_by_index.argtypes = [
     c_void_p
 ]
 
+pa_context_set_default_sink = p.pa_context_set_default_sink
+pa_context_set_default_sink.restype = POINTER(PA_OPERATION)
+pa_context_set_default_sink.argtypes = [
+    POINTER(PA_CONTEXT),
+    c_char_p,
+    PA_CONTEXT_SUCCESS_CB_T,
+    c_void_p
+]
+
 pa_context_get_source_output_info = p.pa_context_get_source_output_info
 pa_context_get_source_output_info.restype = POINTER(c_int)
 pa_context_get_source_output_info.argtypes = [
@@ -562,6 +586,15 @@ pa_context_set_source_port_by_index.argtypes = [
     c_void_p
 ]
 
+pa_context_set_default_source = p.pa_context_set_default_source
+pa_context_set_default_source.restype = POINTER(PA_OPERATION)
+pa_context_set_default_source.argtypes = [
+    POINTER(PA_CONTEXT),
+    c_char_p,
+    PA_CONTEXT_SUCCESS_CB_T,
+    c_void_p
+]
+
 pa_context_get_client_info_list = p.pa_context_get_client_info_list
 pa_context_get_client_info_list.restype = POINTER(c_int)
 pa_context_get_client_info_list.argtypes = [
@@ -610,6 +643,14 @@ pa_context_set_card_profile_by_index.argtypes = [
     c_void_p
 ]
 
+pa_context_get_server_info = p.pa_context_get_server_info
+pa_context_get_server_info.restype = POINTER(PA_OPERATION)
+pa_context_get_server_info.argtypes = [
+    POINTER(PA_CONTEXT),
+    PA_SERVER_INFO_CB_T,
+    c_void_p
+]
+
 # ^ bindings
 #########################################################################################
 # v lib
@@ -620,6 +661,16 @@ class PulsePort():
         self.name = pa_port.name
         self.description = pa_port.description
         self.priority = pa_port.priority
+
+    def debug(self):
+        pprint(vars(self))
+
+class PulseServer():
+
+    def __init__(self, pa_server):
+        self.default_sink_name = pa_server.default_sink_name
+        self.default_source_name = pa_server.default_source_name
+        self.server_version = pa_server.server_version
 
     def debug(self):
         pprint(vars(self))
@@ -794,6 +845,10 @@ class Pulse():
     def source_cb(self, c, source_info, eof, userdata):
         self.data.append(PulseSourceInfo(source_info[0]))
 
+    def server_cb(self, c, server_info, eof):
+        self.data.append(PulseServer(server_info[0]))
+        self.complete_action()
+
     def context_success(self, c, success, userdata):
         self.complete_action()
         return 0
@@ -838,6 +893,13 @@ class Pulse():
         self.iterate()
         data, self.data = self.data, []
         return data or []
+
+    def get_server_info(self):
+        CB = PA_SERVER_INFO_CB_T(self.server_cb)
+        self.operation = pa_context_get_server_info(self.context, CB, None)
+        self.iterate()
+        data, self.data = self.data, []
+        return data[0] or None
 
     def card_list(self):
         CB = PA_CARD_INFO_CB_T(self.card_cb)
@@ -895,6 +957,13 @@ class Pulse():
                                                           CONTEXT, None)
         self.iterate()
 
+    def set_default_sink(self, name):
+        CONTEXT = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
+        self.operation = pa_context_set_default_sink(self.context,
+                                                           name,
+                                                           CONTEXT, None)
+        self.iterate()
+
     def set_sink_port(self, index, port):
         CONTEXT = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
         self.operation = pa_context_set_sink_port_by_index(self.context,
@@ -921,6 +990,13 @@ class Pulse():
         self.operation = pa_context_suspend_source_by_index(self.context,
                                                             index, suspend,
                                                             CONTEXT, None)
+        self.iterate()
+
+    def set_default_source(self, name):
+        CONTEXT = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
+        self.operation = pa_context_set_default_source(self.context,
+                                                           name,
+                                                           CONTEXT, None)
         self.iterate()
 
     def set_source_port(self, index, port):
@@ -980,16 +1056,10 @@ class PulseSinkInfo(PulseSink):
     def __init__(self, pa_sink_info):
         PulseSink.__init__(self, pa_sink_info)
         self.description = pa_sink_info.description
-        self.sample_spec = pa_sink_info.sample_spec
-        self.channel_map = pa_sink_info.channel_map
         self.owner_module = pa_sink_info.owner_module
-        self.latency = pa_sink_info.latency
         self.driver = pa_sink_info.driver
         self.monitor_source = pa_sink_info.monitor_source
         self.monitor_source_name = pa_sink_info.monitor_source_name
-        self.flags = pa_sink_info.flags
-        self.proplist = pa_sink_info.proplist
-        self.configured_latency = pa_sink_info.configured_latency
         self.n_ports = pa_sink_info.n_ports
         self.ports = [PulsePort(pa_sink_info.ports[i].contents) for i in range(self.n_ports)]
         self.active_port = None
@@ -1009,11 +1079,6 @@ class PulseSinkInputInfo(PulseSink):
         self.client = PulseClient(pa_sink_input_info.name)
         self.client_id = pa_sink_input_info.client
         self.sink = self.owner = pa_sink_input_info.sink
-        self.channel_map = pa_sink_input_info.channel_map
-        self.sample_spec = pa_sink_input_info.sample_spec
-        self.buffer_usec = pa_sink_input_info.buffer_usec
-        self.sink_usec = pa_sink_input_info.sink_usec
-        self.resample_method = pa_sink_input_info.resample_method
         self.driver = pa_sink_input_info.driver
 
     def __str__(self):
@@ -1040,16 +1105,10 @@ class PulseSourceInfo(PulseSource):
     def __init__(self, pa_source_info):
         PulseSource.__init__(self, pa_source_info)
         self.description = pa_source_info.description
-        self.sample_spec = pa_source_info.sample_spec
-        self.channel_map = pa_source_info.channel_map
         self.owner_module = pa_source_info.owner_module
         self.monitor_of_sink = pa_source_info.monitor_of_sink
         self.monitor_of_sink_name = pa_source_info.monitor_of_sink_name
-        self.latency = pa_source_info.latency
         self.driver = pa_source_info.driver
-        self.flags = pa_source_info.flags
-        self.proplist = pa_source_info.proplist
-        self.configured_latency = pa_source_info.configured_latency
         self.n_ports = pa_source_info.n_ports
         self.ports = [PulsePort(pa_source_info.ports[i].contents) for i in range(self.n_ports)]
         self.active_port = None
@@ -1069,11 +1128,6 @@ class PulseSourceOutputInfo(PulseSource):
         self.client = PulseClient(pa_source_output_info.name)
         self.client_id = pa_source_output_info.client
         self.source = self.owner = pa_source_output_info.source
-        self.sample_spec = pa_source_output_info.sample_spec
-        self.channel_map = pa_source_output_info.channel_map
-        self.buffer_usec = pa_source_output_info.buffer_usec
-        self.source_usec = pa_source_output_info.source_usec
-        self.resample_method = pa_source_output_info.resample_method
         self.driver = pa_source_output_info.driver
 
     def __str__(self):
@@ -1110,10 +1164,6 @@ class PulseVolume():
 # v main
 
 pulse = Pulse('pulsemixer')
-
-
-class Spacer():
-    pass
 
 
 class Bar():
@@ -1370,7 +1420,7 @@ class Screen():
                     [self.scroll(self.UP) for _ in range(n)]
                 else:
                     self.scroll(self.UP)
-                if type(self.data[self.top_line_num + self.focus_line_num][0]) == Spacer:
+                if not self.data[self.top_line_num + self.focus_line_num][0]:
                     self.scroll(self.UP)
             elif c == curses.KEY_DOWN or c == ord('j'):
                 if bar.locked:
@@ -1381,7 +1431,7 @@ class Screen():
                     [self.scroll(self.DOWN) for _ in range(n)]
                 else:
                     self.scroll(self.DOWN)
-                if type(self.data[self.top_line_num + self.focus_line_num][0]) == Spacer:
+                if not self.data[self.top_line_num + self.focus_line_num][0]:
                     self.scroll(self.DOWN)
 
             elif c == ord('m'):
@@ -1497,7 +1547,7 @@ class Screen():
         for i, s in enumerate(f):
             tmp.append(s)
             if s[0].stream_index == s[0].owned and s[1] == s[0].channels - 1 and i != l - 1:
-                tmp.append((Spacer(), -1, 0, 0))
+                tmp.append((None, -1, 0, 0))
         return tmp
 
     def get_data(self):
@@ -1511,11 +1561,12 @@ class Screen():
             self.data = self.build(self.modes[2][0], pulse.sink_list(), [])
         elif type(self.selected[0].pa) is PulseSourceOutputInfo:
             self.data = self.build(self.modes[3][0], pulse.source_list(), [])
+        self.server = pulse.get_server_info()
         self.n_lines = len(self.data)
         if not self.n_lines:
             self.focus_line_num = 0
             self.data.append((Bar('no data'), Bar.NONE, 0))
-        if type(self.data[self.top_line_num + self.focus_line_num][0]) == Spacer:
+        if not self.data[self.top_line_num + self.focus_line_num][0]:
             self.scroll(self.UP)
 
     def display(self):
@@ -1525,7 +1576,7 @@ class Screen():
         self.display_line(0, self.menu)
         for index, line in enumerate(self.data[top:bottom]):
             bar, bartype = line[0], line[1]
-            if type(bar) == Spacer:
+            if not bar:
                 self.screen.addstr(index + 1, 0, '', curses.A_DIM)
                 continue
             if bartype is Bar.NONE:
@@ -1692,11 +1743,9 @@ def main():
     sink_inputs = pulse.sink_input_list()
     sources = pulse.source_list()
     source_outputs = pulse.source_output_list()
+    server_info = pulse.get_server_info()
+    index = [s.index for s in sinks if s.name == server_info.default_sink_name][0]
     streams = {}
-    try:
-        index = sinks[0].index
-    except:
-        sys.exit("ERR: Can't find master sink")
     for i in source_outputs + sources + sink_inputs + sinks:
         streams[i.index] = i
     check_id = lambda x: x in streams or sys.exit('ERR: No such ID: ' + str(x))
@@ -1778,3 +1827,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
