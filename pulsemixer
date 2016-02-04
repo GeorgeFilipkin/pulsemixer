@@ -1316,7 +1316,7 @@ class Screen():
         self.info = '{}|{}\n{}|{}\n{}|{}\n'.format(
             "L ", self.red if bar.locked else curses.A_DIM,
             "M  ", self.red if bar.muted else curses.A_DIM, name, curses.A_NORMAL)
-        self.info += '{:>{}}%|{}'.format(pos, self.cols-len(name)-9, curses.A_BOLD)
+        self.info += '{:>{}}%|{}'.format(pos, self.cols-len(name)-8, curses.A_BOLD)
 
     def check_resize(self):
         if curses.is_term_resized(curses.LINES, curses.COLS):
@@ -1368,7 +1368,7 @@ class Screen():
                 if not self.submenu_show and self.change_mode_allowed and side != Bar.NONE:
                     self.selected = self.data[focus]
                     if type(self.selected[0].pa) in (PulseSinkInfo, PulseSourceInfo):
-                        self.submenu_data = ['Suspend', 'Resume']
+                        self.submenu_data = ['Suspend', 'Resume', 'Set as default']
                         if self.selected[0].pa.n_ports:
                             self.submenu_data.append('Set port')
                     else:
@@ -1477,6 +1477,11 @@ class Screen():
                     pulse.sink_suspend(self.selected[2], 0)
                 else:
                     pulse.source_suspend(self.selected[2], 0)
+            elif self.action == 'Set as default':
+                if type(self.selected[0].pa) is PulseSinkInfo:
+                    pulse.set_default_sink(self.selected[0].pa.name)
+                else:
+                    pulse.set_default_source(self.selected[0].pa.name)
             elif self.action == 'Set port':
                 self.submenu_data = []
                 for i in self.selected[0].pa.ports:
@@ -1601,9 +1606,9 @@ class Screen():
                 if bar.owner == -1:
                     tree = ' '
                 if bar.owner != -1:
-                    tree = ' ├──'
+                    tree = ' ├─'
                     if bar.stream_index == bar.owned:
-                        tree = ' └──'
+                        tree = ' └─'
                 if bar.channels != 1:
                     brackets = ['┌', '┐']
                 else:
@@ -1635,7 +1640,7 @@ class Screen():
                 bracket_hi = bracket_hi | self.red
                 focus_hi = focus_hi | self.muted_color
 
-            off = 5 * (self.cols // 40) - len(tree)
+            off = 6 * (self.cols // 40) - len(tree)
             cols = self.cols - 32 - off - len(tree)
             vol = list('-' * (cols - (cols % 3 != 0)))
             n = int(len(vol) * bar.volume[bartype] / bar.maxsize)
@@ -1643,7 +1648,7 @@ class Screen():
             vol = ''.join(vol)
             if bartype is Bar.LEFT:
                 if bar.pa.name in (self.server.default_sink_name, self.server.default_source_name):
-                    tree = '✓'
+                    tree = '▶'
                 name = bar.name
                 if len(bar.name) > 20 + off:
                     name = bar.name[:20 + off] + '..'
