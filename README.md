@@ -15,7 +15,7 @@ Usage of pulsemixer:
   -l, --list               list everything
   --list-sources           list sources
   --list-sinks             list sinks
-  --id ID                  specify ID. If no ID specified - master sink is used
+  --id ID                  specify ID. If no ID specified - default sink is used
   --set-volume n           set volume for ID
   --set-volume-all n:n     set volume for ID (for every channel)
   --change-volume +-n      change volume for ID
@@ -49,7 +49,7 @@ And has the following controls:
   q/Esc/^C                      quit
 ```
 
-Via context menu it is possible to `move-sink-input`, `move-source-output`, `suspend-sink`, `suspend-source`, `set-sink-port`, `set-source-port`. See `man pactl` for details on these features.
+Via context menu it is possible to `set-default-sink`, `set-default-source`, `move-sink-input`, `move-source-output`, `suspend-sink`, `suspend-source`, `set-sink-port`, `set-source-port`. See `man pactl` for details on these features.
 
 ## License
 This project is licensed under the terms of the MIT license
