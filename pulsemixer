@@ -1202,6 +1202,15 @@ class Bar():
     def lock_toggle(self):
         self.locked = not self.locked
 
+    def set(self, n, side):
+        vol = self.pa.volume
+        if self.locked:
+            for i, _ in enumerate(vol.values):
+                vol.values[i] = n
+        else:
+            vol.values[side] = n
+        pulse.set_volume(self.pa, vol)
+
     def move(self, n, side):
         vol = self.pa.volume
         if self.locked:
@@ -1218,6 +1227,7 @@ class Screen():
     SPACE_KEY = 32
     ESC_KEY = 27
     MODE = {0: 1, 1: 0}
+    DIGITS = list(map(ord, map(str, range(10))))
     SIDES = {Bar.LEFT: 'Left', Bar.RIGHT: 'Right', Bar.RLEFT: 'Rear Left',
              Bar.RRIGHT: 'Rear Right', Bar.CENTER: 'Center', Bar.SUB: 'Subwoofer',
              Bar.SLEFT: 'Side left', Bar.SRIGHT: 'Side right'}
@@ -1446,6 +1456,9 @@ class Screen():
                 bar.move(-10, side)
             elif c == curses.KEY_SRIGHT or c == ord('L'):
                 bar.move(10, side)
+            elif c in self.DIGITS:
+                percent = int(chr(c)) * 10
+                bar.set(100 if percent == 0 else percent, side)
 
     def run_submenu(self):
         c = self.screen.getch()
