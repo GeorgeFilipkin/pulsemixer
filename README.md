@@ -40,6 +40,7 @@ And has the following controls:
   h/j/k/l                       navigation, volume change
   arrows                        navigation, volume change
   H/L, Shift+Left/Shift+Right   change volume by 10
+  1/2/3/4/5/6/7/8/9/0           set volume to 10%/20%/30%/40%/50%/60%/70%/80%/90%/100%
   m                             mute/unmute
   Space                         lock/unlock channels together
   Enter                         context menu
