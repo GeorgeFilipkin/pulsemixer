@@ -45,10 +45,6 @@ class PA_MAINLOOP(Structure):
     pass
 
 
-class PA_STREAM(Structure):
-    pass
-
-
 class PA_MAINLOOP_API(Structure):
     pass
 
@@ -58,10 +54,6 @@ class PA_CONTEXT(Structure):
 
 
 class PA_OPERATION(Structure):
-    pass
-
-
-class PA_IO_EVENT(Structure):
     pass
 
 
@@ -157,8 +149,6 @@ class PA_SOURCE_OUTPUT_INFO(Structure):
         ("corked",          c_int),
         ("volume",          PA_CVOLUME),
         ("mute",            c_int),
-        ('has_volume',      c_int),
-        ('volume_writable', c_int),
     ]
 
 
@@ -220,6 +210,7 @@ class PA_CARD_INFO(Structure):
         ('proplist', POINTER(c_int)),
     ]
 
+
 class PA_SERVER_INFO(Structure):
     _fields_ = [
         ('user_name', c_char_p),
@@ -269,10 +260,6 @@ PA_SOURCE_INFO_CB_T = CFUNCTYPE(c_int,
                                 c_int,
                                 c_void_p)
 
-PA_CONTEXT_DRAIN_CB_T = CFUNCTYPE(c_void_p,
-                                  POINTER(PA_CONTEXT),
-                                  c_void_p)
-
 PA_CONTEXT_SUCCESS_CB_T = CFUNCTYPE(c_void_p,
                                     POINTER(PA_CONTEXT),
                                     c_int,
@@ -288,9 +275,6 @@ PA_SERVER_INFO_CB_T = CFUNCTYPE(None,
                                 POINTER(PA_CONTEXT),
                                 POINTER(PA_SERVER_INFO),
                                 c_void_p)
-pa_strerror = p.pa_strerror
-pa_strerror.restype = c_char_p
-pa_strerror.argtypes = [c_int]
 
 pa_mainloop_new = p.pa_mainloop_new
 pa_mainloop_new.restype = POINTER(PA_MAINLOOP)
@@ -307,14 +291,6 @@ pa_mainloop_run.argtypes = [POINTER(PA_MAINLOOP), POINTER(c_int)]
 pa_mainloop_iterate = p.pa_mainloop_iterate
 pa_mainloop_iterate.restype = c_int
 pa_mainloop_iterate.argtypes = [POINTER(PA_MAINLOOP), c_int, POINTER(c_int)]
-
-pa_mainloop_quit = p.pa_mainloop_quit
-pa_mainloop_quit.restype = c_int
-pa_mainloop_quit.argtypes = [POINTER(PA_MAINLOOP), c_int]
-
-pa_mainloop_dispatch = p.pa_mainloop_dispatch
-pa_mainloop_dispatch.restype = c_int
-pa_mainloop_dispatch.argtypes = [POINTER(PA_MAINLOOP)]
 
 pa_mainloop_free = p.pa_mainloop_free
 pa_mainloop_free.restype = c_int
@@ -356,14 +332,6 @@ pa_context_connect.argtypes = [
 pa_context_get_state = p.pa_context_get_state
 pa_context_get_state.restype = c_int
 pa_context_get_state.argtypes = [POINTER(PA_CONTEXT)]
-
-pa_context_drain = p.pa_context_drain
-pa_context_drain.restype = POINTER(PA_OPERATION)
-pa_context_drain.argtypes = [
-    POINTER(PA_CONTEXT),
-    PA_CONTEXT_DRAIN_CB_T,
-    c_void_p
-]
 
 pa_context_disconnect = p.pa_context_disconnect
 pa_context_disconnect.restype = c_int
@@ -511,15 +479,6 @@ pa_context_set_source_output_mute.argtypes = [
     c_void_p
 ]
 
-pa_context_kill_source_output = p.pa_context_kill_source_output
-pa_context_kill_source_output.restype = POINTER(c_int)
-pa_context_kill_source_output.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    PA_CONTEXT_SUCCESS_CB_T,
-    c_void_p
-]
-
 pa_context_get_source_info_by_index = p.pa_context_get_source_info_by_index
 pa_context_get_source_info_by_index.restype = POINTER(c_int)
 pa_context_get_source_info_by_index.argtypes = [
@@ -603,19 +562,6 @@ pa_context_get_client_info_list.argtypes = [
     c_void_p
 ]
 
-pa_context_get_client_info = p.pa_context_get_client_info
-pa_context_get_client_info.restype = POINTER(c_int)
-pa_context_get_client_info.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    PA_CLIENT_INFO_CB_T,
-    c_void_p
-]
-
-pa_operation_unref = p.pa_operation_unref
-pa_operation_unref.restype = c_int
-pa_operation_unref.argtypes = [POINTER(PA_OPERATION)]
-
 pa_context_get_card_info_by_index = p.pa_context_get_card_info_by_index
 pa_context_get_card_info_by_index.restype = POINTER(PA_OPERATION)
 pa_context_get_card_info_by_index.argtypes = [
@@ -633,16 +579,6 @@ pa_context_get_card_info_list.argtypes = [
     c_void_p
 ]
 
-pa_context_set_card_profile_by_index = p.pa_context_set_card_profile_by_index
-pa_context_set_card_profile_by_index.restype = POINTER(PA_OPERATION)
-pa_context_set_card_profile_by_index.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    c_char_p,
-    PA_CONTEXT_SUCCESS_CB_T,
-    c_void_p
-]
-
 pa_context_get_server_info = p.pa_context_get_server_info
 pa_context_get_server_info.restype = POINTER(PA_OPERATION)
 pa_context_get_server_info.argtypes = [
@@ -655,6 +591,7 @@ pa_context_get_server_info.argtypes = [
 #########################################################################################
 # v lib
 
+
 class PulsePort():
 
     def __init__(self, pa_port):
@@ -664,6 +601,7 @@ class PulsePort():
 
     def debug(self):
         pprint(vars(self))
+
 
 class PulseServer():
 
@@ -709,14 +647,13 @@ class PulseClient():
 
 class Pulse():
 
-    def __init__(self, client_name=None):
+    def __init__(self, client_name='libpulse'):
         self.ret = None
-        self.context = None
         self.operation = None
         self.connected = False
         self.action_done = False
         self.data = []
-        self.client_name = (client_name or 'libpulse').encode()
+        self.client_name = client_name.encode()
 
         self.pa_signal_cb = PA_SIGNAL_CB_T(self.signal_cb)
         self.pa_state_cb = PA_STATE_CB_T(self.state_cb)
@@ -724,8 +661,7 @@ class Pulse():
         self.mainloop = pa_mainloop_new()
         self.mainloop_api = pa_mainloop_get_api(self.mainloop)
 
-        if pa_signal_init(self.mainloop_api) != 0:
-            raise Exception("pa_signal_init failed")
+        assert pa_signal_init(self.mainloop_api) == 0, "pa_signal_init failed"
 
         pa_signal_new(2, self.pa_signal_cb, None)
         pa_signal_new(15, self.pa_signal_cb, None)
@@ -960,8 +896,8 @@ class Pulse():
     def set_default_sink(self, name):
         CONTEXT = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
         self.operation = pa_context_set_default_sink(self.context,
-                                                           name,
-                                                           CONTEXT, None)
+                                                     name,
+                                                     CONTEXT, None)
         self.iterate()
 
     def set_sink_port(self, index, port):
@@ -995,8 +931,8 @@ class Pulse():
     def set_default_source(self, name):
         CONTEXT = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
         self.operation = pa_context_set_default_source(self.context,
-                                                           name,
-                                                           CONTEXT, None)
+                                                       name,
+                                                       CONTEXT, None)
         self.iterate()
 
     def set_source_port(self, index, port):
@@ -1134,8 +1070,7 @@ class PulseSourceOutputInfo(PulseSource):
         if self.client:
             return "ID: {}, Name: {}, Mute: {}, {}".format(
                 self.index, self.client.name.decode(), self.mute, self.volume)
-        return "ID: {}, Name: {}, Mute: {}".format(
-            self.index, self.name.decode(), self.mute)
+        return "ID: {}, Name: {}, Mute: {}".format(self.index, self.name.decode(), self.mute)
 
 
 class PulseVolume():
@@ -1264,7 +1199,7 @@ class Screen():
         self.submenu_show = False
         self.submenu = curses.newwin(curses.LINES, 25, 0, 0)
         self.helpwin_show = False
-        self.helpwin = curses.newwin(12, 62, 0, 0)
+        self.helpwin = curses.newwin(13, 62, 0, 0)
         try:
             self.helpwin.mvwin((curses.LINES // 2) - 6, (curses.COLS // 2) - 31)
         except:
@@ -1326,7 +1261,7 @@ class Screen():
         self.info = '{}|{}\n{}|{}\n{}|{}\n'.format(
             "L ", self.red if bar.locked else curses.A_DIM,
             "M  ", self.red if bar.muted else curses.A_DIM, name, curses.A_NORMAL)
-        self.info += '{:>{}}%|{}'.format(pos, self.cols-len(name)-8, curses.A_BOLD)
+        self.info += '{:>{}}%|{}'.format(pos, self.cols - len(name) - 8, curses.A_BOLD)
 
     def check_resize(self):
         if curses.is_term_resized(curses.LINES, curses.COLS):
@@ -1334,7 +1269,7 @@ class Screen():
             y, x = self.screen.getmaxyx()
             curses.resizeterm(y, x)
             self.submenu.resize(curses.LINES, 25)
-            self.helpwin.resize(12, 62)
+            self.helpwin.resize(13, 62)
             self.helpwin.mvwin((curses.LINES // 2) - 6, (curses.COLS // 2) - 31)
             self.helpwin_show = False
             self.screen.refresh()
@@ -1395,10 +1330,10 @@ class Screen():
                     if self.action == 'Move':
                         if type(self.selected[0].pa) is PulseSinkInputInfo:
                             pulse.sink_input_move(self.selected[0].index,
-                                                        self.data[focus][0].pa.index)
+                                                  self.data[focus][0].pa.index)
                         elif type(self.selected[0].pa) is PulseSourceOutputInfo:
                             pulse.source_output_move(self.selected[0].index,
-                                                           self.data[focus][0].pa.index)
+                                                     self.data[focus][0].pa.index)
                         self.change_mode(self.old_mode)
                         self.focus_line_num = self.modes[4][1]
                         self.top_line_num = self.modes[4][2]
@@ -1506,10 +1441,10 @@ class Screen():
             else:
                 if type(self.selected[0].pa) is PulseSinkInfo:
                     pulse.set_sink_port(self.selected[0].pa.index,
-                                              self.selected[0].pa.ports[focus].name)
+                                        self.selected[0].pa.ports[focus].name)
                 elif type(self.selected[0].pa) is PulseSourceInfo:
                     pulse.set_source_port(self.selected[0].pa.index,
-                                                self.selected[0].pa.ports[focus].name)
+                                          self.selected[0].pa.ports[focus].name)
             self.change_mode_allowed = True
             self.submenu_show = False
             self.focus_line_num = self.modes[4][1]
@@ -1691,6 +1626,7 @@ class Screen():
         '''h/j/k/l                       navigation, volume change
           arrows                        navigation, volume change
           H/L, Shift+Left/Shift+Right   change volume by 10
+          1/2/3/4/5/6/7/8/9/0           set volume to 10%-100%
           m                             mute/unmute
           Space                         lock/unlock channels together
           Enter                         context menu
@@ -1832,8 +1768,7 @@ def main():
             vol = streams[index].volume
             arg = arg.strip(':').split(':')
             if len(arg) != len(vol.values):
-                sys.exit("ERR: Specified volumes not equal to number of channles"
-                         " in the stream")
+                sys.exit("ERR: Specified volumes not equal to number of channles in the stream")
             for i, _ in enumerate(vol.values):
                 vol.values[i] = int(arg[i])
             pulse.set_volume(streams[index], vol)
@@ -1847,4 +1782,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
