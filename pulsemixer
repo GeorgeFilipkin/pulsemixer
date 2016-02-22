@@ -650,7 +650,6 @@ class Pulse():
     def __init__(self, client_name='libpulse'):
         self.ret = None
         self.operation = None
-        self.connected = False
         self.action_done = False
         self.data = []
         self.client_name = client_name.encode()
@@ -670,7 +669,8 @@ class Pulse():
         pa_context_set_state_callback(self.context, self.pa_state_cb, None)
 
         if pa_context_connect(self.context, None, 0, None) < 0:
-            self.context_error()
+            self.disconnect()
+            sys.exit("Failed to connect to pulseaudio daemon: Connection refused")
         self.iterate()
 
     def unmute_stream(self, obj):
@@ -738,11 +738,7 @@ class Pulse():
 
     def state_cb(self, c, b):
         state = pa_context_get_state(c)
-        if state == 4:
-            self.complete_action()
-            self.connected = True
-        elif state == 5:
-            self.connected = False
+        if state in (4, 5):
             self.complete_action()
         elif state == 6:
             sys.exit(pa_context_errno(c))
@@ -798,9 +794,6 @@ class Pulse():
     def disconnect(self):
         pa_context_disconnect(self.context)
         pa_mainloop_free(self.mainloop)
-
-    def context_error(self):
-        self.disconnect()
 
     def sink_input_list(self):
         CB = PA_SINK_INPUT_INFO_CB_T(self.sink_input_cb)
@@ -1197,7 +1190,7 @@ class Screen():
         self.gradient = [self.green, self.yellow, self.red]
         self.submenu_data = []
         self.submenu_show = False
-        self.submenu = curses.newwin(curses.LINES, 25, 0, 0)
+        self.submenu = curses.newwin(curses.LINES, 30, 0, 0)
         self.helpwin_show = False
         self.helpwin = curses.newwin(13, 62, 0, 0)
         try:
@@ -1268,7 +1261,7 @@ class Screen():
             self.screen.erase()
             y, x = self.screen.getmaxyx()
             curses.resizeterm(y, x)
-            self.submenu.resize(curses.LINES, 25)
+            self.submenu.resize(curses.LINES, 30)
             self.helpwin.resize(13, 62)
             self.helpwin.mvwin((curses.LINES // 2) - 6, (curses.COLS // 2) - 31)
             self.helpwin_show = False
@@ -1649,7 +1642,7 @@ class Screen():
         self.submenu.erase()
         top = self.top_line_num
         bottom = self.top_line_num + self.lines + 2
-        self.submenu.vline(0, 24, curses.ACS_VLINE, self.lines + 2)
+        self.submenu.vline(0, 29, curses.ACS_VLINE, self.lines + 2)
         for index, line in enumerate(self.submenu_data[top:bottom]):
             focus_hi = curses.A_BOLD if index == self.focus_line_num else curses.A_NORMAL
             if '|' in line:
