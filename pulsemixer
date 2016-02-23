@@ -1164,7 +1164,10 @@ class Screen():
         environ['ESCDELAY'] = '25'
         self.screen = curses.initscr()
         self.screen.timeout(1000)
-        curses.curs_set(0)
+        try:
+            curses.curs_set(0)
+        except: #terminal doesn't support visibility requests
+            pass
         self.screen.border(0)
         self.index = 0
         self.top_line_num = 0
@@ -1182,11 +1185,12 @@ class Screen():
         curses.init_pair(1, curses.COLOR_GREEN, -1)
         curses.init_pair(2, curses.COLOR_YELLOW, -1)
         curses.init_pair(3, curses.COLOR_RED, -1)
-        curses.init_pair(67, 66, -1)
         self.green = curses.color_pair(1)
         self.yellow = curses.color_pair(2)
         self.red = curses.color_pair(3)
-        self.muted_color = curses.color_pair(67)
+        n = 7 if curses.COLORS < 256 else 67
+        curses.init_pair(n, n - 1, -1)
+        self.muted_color = curses.color_pair(n)
         self.gradient = [self.green, self.yellow, self.red]
         self.submenu_data = []
         self.submenu_show = False
@@ -1426,7 +1430,10 @@ class Screen():
             elif self.action == 'Set port':
                 self.submenu_data = []
                 for i in self.selected[0].pa.ports:
-                    self.submenu_data.append(i.description.decode().strip('|'))
+                    s = i.description.decode().strip('|')
+                    if len(s) > 29:
+                        s = s[:26] + '..'
+                    self.submenu_data.append(s)
                     if self.selected[0].pa.active_port.name == i.name:
                         self.submenu_data[-1] = " {}|{}".format(self.submenu_data[-1], self.red)
                 self.focus_line_num = self.top_line_num = 0
