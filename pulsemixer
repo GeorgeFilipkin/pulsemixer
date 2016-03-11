@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-'''
-Usage of pulsemixer:
+'''Usage of pulsemixer:
   -h, --help               show this help message and exit
   -v, --version            print version
   -l, --list               list everything
@@ -15,7 +14,7 @@ Usage of pulsemixer:
   --get-volume             get volume for ID
   --mute                   mute ID
   --unmute                 unmute ID
-'''
+  --server                 choose the server to connect to'''
 
 VERSION = '1.1.0'
 
@@ -647,7 +646,7 @@ class PulseClient():
 
 class Pulse():
 
-    def __init__(self, client_name='libpulse'):
+    def __init__(self, client_name='libpulse', server=None):
         self.ret = None
         self.operation = None
         self.action_done = False
@@ -668,7 +667,7 @@ class Pulse():
         self.context = pa_context_new(self.mainloop_api, self.client_name)
         pa_context_set_state_callback(self.context, self.pa_state_cb, None)
 
-        if pa_context_connect(self.context, None, 0, None) < 0:
+        if pa_context_connect(self.context, server, 0, None) < 0:
             self.disconnect()
             sys.exit("Failed to connect to pulseaudio daemon: Connection refused")
         self.iterate()
@@ -738,8 +737,10 @@ class Pulse():
 
     def state_cb(self, c, b):
         state = pa_context_get_state(c)
-        if state in (4, 5):
+        if state == 4:
             self.complete_action()
+        elif state == 5:
+            sys.exit("Failed to connect to pulseaudio daemon: Connection refused")
         elif state == 6:
             sys.exit(pa_context_errno(c))
         return 0
@@ -1091,8 +1092,6 @@ class PulseVolume():
 #########################################################################################
 # v main
 
-pulse = Pulse('pulsemixer')
-
 
 class Bar():
     # should be in correct order
@@ -1166,7 +1165,7 @@ class Screen():
         self.screen.timeout(1000)
         try:
             curses.curs_set(0)
-        except: #terminal doesn't support visibility requests
+        except:  # terminal doesn't support visibility requests
             pass
         self.screen.border(0)
         self.index = 0
@@ -1196,7 +1195,7 @@ class Screen():
         self.submenu_show = False
         self.submenu = curses.newwin(curses.LINES, 30, 0, 0)
         self.helpwin_show = False
-        self.helpwin = curses.newwin(13, 62, 0, 0)
+        self.helpwin = curses.newwin(12, 62, 0, 0)
         try:
             self.helpwin.mvwin((curses.LINES // 2) - 6, (curses.COLS // 2) - 31)
         except:
@@ -1232,9 +1231,10 @@ class Screen():
 
     def update_menu(self):
         if self.change_mode_allowed:
-            self.menu = '{}|{}\n  {}|{}'.format(
+            self.menu = '{}|{}\n  {}|{}\n {:>{}}|{}'.format(
                 "F1 Output", curses.A_BOLD if self.MODE[0] else curses.A_DIM,
-                "F2 Input", curses.A_BOLD if self.MODE[1] else curses.A_DIM)
+                "F2 Input", curses.A_BOLD if self.MODE[1] else curses.A_DIM,
+                "? - help", self.cols - 22, curses.A_DIM)
         else:
             select = 'output' if type(self.selected[0].pa) is PulseSinkInputInfo else 'input'
             self.menu = "Select new {} device:|{}".format(select, curses.A_NORMAL)
@@ -1266,7 +1266,7 @@ class Screen():
             y, x = self.screen.getmaxyx()
             curses.resizeterm(y, x)
             self.submenu.resize(curses.LINES, 30)
-            self.helpwin.resize(13, 62)
+            self.helpwin.resize(12, 62)
             self.helpwin.mvwin((curses.LINES // 2) - 6, (curses.COLS // 2) - 31)
             self.helpwin_show = False
             self.screen.refresh()
@@ -1480,15 +1480,13 @@ class Screen():
                 for c in range(s[0].volume.channels):
                     to.append((bar, c, s[0].index, s[0].volume.channels))
         for i in reversed(range(len(to))):
-            found = False
             data = to[i]
             for s in tmp:
                 if s[0].index == data[2] and type(s[0]) == type(data[0].pa):
                     y = s[2] - (data[3] - data[1])
                     to[i], to[y] = to[y], to[i]
-                    found = True
                     break
-            if not found:
+            else:
                 del to[i]
                 if self.focus_line_num + self.top_line_num >= i:
                     self.scroll(self.UP)
@@ -1539,11 +1537,8 @@ class Screen():
             # hightlight lines from same bar
             same, found = [], False
             for i, v in enumerate(self.data[top:bottom]):
-                if found:
-                    break
-                elif v[0] is self.data[self.top_line_num + self.focus_line_num][0]:
+                if v[0] is self.data[self.top_line_num + self.focus_line_num][0]:
                     same.append(v[0])
-                    found = True
 
             tree = ' '
             if bar.owner == -1 and bar.owned > bar.channels:
@@ -1632,7 +1627,6 @@ class Screen():
           Enter                         context menu
           F1/F2                         change modes
           Tab                           go to next mode
-          ?                             show help
           q/Esc/^C                      quit'''
         self.helpwin.erase()
         self.helpwin.border()
@@ -1677,22 +1671,28 @@ class Screen():
 
 
 def usage():
-    print(__doc__, "\nInteractive help:")
-    for s in Screen.display_helpwin.__doc__.split('\n'):
-        print(" ", s.strip())
+    print(__doc__)
+
+pulse = None
 
 
 def main():
     try:
         opts, args = getopt.getopt(
             sys.argv[1:], "hvl",
-            ["help", "version", "list", "list-sinks", "list-sources", "id=",
+            ["help", "version", "server=", "list", "list-sinks", "list-sources", "id=",
              "set-volume=", "set-volume-all=", "change-volume=", "get-volume",
              "get-mute", "toggle-mute", "mute", "unmute"])
     except getopt.GetoptError as err:
         sys.exit("ERR: {}".format(err))
+    assert args == [], sys.exit('ERR: {} not not recognized'.format(' '.join(args).strip()))
 
-    if len(sys.argv) == 1:
+    dopts = dict(opts)
+    server = dopts.get('--server', '').encode() or None
+    global pulse
+    pulse = Pulse('pulsemixer', server)
+
+    if len(sys.argv) == 1 or (len(dopts) == 1 and server):
         curses.wrapper(Screen().run)
 
     sinks = pulse.sink_list()

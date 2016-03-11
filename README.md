@@ -24,6 +24,7 @@ Usage of pulsemixer:
   --get-volume             get volume for ID
   --mute                   mute ID
   --unmute                 unmute ID
+  --server                 choose the server to connect to
 ```
 It is possible to repeat arguments:
 ```
@@ -46,7 +47,6 @@ And has the following controls:
   Enter                         context menu
   F1/F2                         change modes
   Tab                           go to next mode
-  ?                             show help
   q/Esc/^C                      quit
 ```
 
