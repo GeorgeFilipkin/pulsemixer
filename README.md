@@ -50,7 +50,7 @@ And has the following controls:
   q/Esc/^C                      quit
 ```
 
-Via context menu it is possible to `set-default-sink`, `set-default-source`, `move-sink-input`, `move-source-output`, `suspend-sink`, `suspend-source`, `set-sink-port`, `set-source-port`. See `man pactl` for details on these features.
+Via context menu it is possible to `set-default-sink`, `set-default-source`, `move-sink-input`, `move-source-output`, `suspend-sink`, `suspend-source`, `set-sink-port`, `set-source-port`, `kill-client`, `kill-sink-input`, `kill-source-output`. See `man pactl` for details on these features.
 
 ## License
 This project is licensed under the terms of the MIT license

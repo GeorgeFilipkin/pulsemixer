@@ -431,6 +431,24 @@ pa_context_set_default_sink.argtypes = [
     c_void_p
 ]
 
+pa_context_kill_sink_input = p.pa_context_kill_sink_input
+pa_context_kill_sink_input.restype = POINTER(PA_OPERATION)
+pa_context_kill_sink_input.argtypes = [
+    POINTER(PA_CONTEXT),
+    c_uint32,
+    PA_CONTEXT_SUCCESS_CB_T,
+    c_void_p
+]
+
+pa_context_kill_client = p.pa_context_kill_client
+pa_context_kill_client.restype = POINTER(PA_OPERATION)
+pa_context_kill_client.argtypes = [
+    POINTER(PA_CONTEXT),
+    c_uint32,
+    PA_CONTEXT_SUCCESS_CB_T,
+    c_void_p
+]
+
 pa_context_get_source_output_info = p.pa_context_get_source_output_info
 pa_context_get_source_output_info.restype = POINTER(c_int)
 pa_context_get_source_output_info.argtypes = [
@@ -549,6 +567,15 @@ pa_context_set_default_source.restype = POINTER(PA_OPERATION)
 pa_context_set_default_source.argtypes = [
     POINTER(PA_CONTEXT),
     c_char_p,
+    PA_CONTEXT_SUCCESS_CB_T,
+    c_void_p
+]
+
+pa_context_kill_source_output = p.pa_context_kill_source_output
+pa_context_kill_source_output.restype = POINTER(PA_OPERATION)
+pa_context_kill_source_output.argtypes = [
+    POINTER(PA_CONTEXT),
+    c_uint32,
     PA_CONTEXT_SUCCESS_CB_T,
     c_void_p
 ]
@@ -894,6 +921,20 @@ class Pulse():
                                                      CONTEXT, None)
         self.iterate()
 
+    def kill_sink(self, index):
+        CONTEXT = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
+        self.operation = pa_context_kill_sink_input(self.context,
+                                                    index,
+                                                    CONTEXT, None)
+        self.iterate()
+
+    def kill_client(self, index):
+        CONTEXT = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
+        self.operation = pa_context_kill_client(self.context,
+                                                index,
+                                                CONTEXT, None)
+        self.iterate()
+
     def set_sink_port(self, index, port):
         CONTEXT = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
         self.operation = pa_context_set_sink_port_by_index(self.context,
@@ -926,6 +967,13 @@ class Pulse():
         CONTEXT = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
         self.operation = pa_context_set_default_source(self.context,
                                                        name,
+                                                       CONTEXT, None)
+        self.iterate()
+
+    def kill_source(self, index):
+        CONTEXT = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
+        self.operation = pa_context_kill_source_output(self.context,
+                                                       index,
                                                        CONTEXT, None)
         self.iterate()
 
@@ -1314,7 +1362,7 @@ class Screen():
                         if self.selected[0].pa.n_ports:
                             self.submenu_data.append('Set port')
                     else:
-                        self.submenu_data = ['Move']
+                        self.submenu_data = ['Move', 'Kill']
                     self.submenu_show = True
                     self.modes[4][0] = 0
                     self.modes[4][1] = self.focus_line_num
@@ -1412,6 +1460,14 @@ class Screen():
                     self.change_mode(3)
                 self.change_mode_allowed = self.submenu_show = False
                 return
+            elif self.action == 'Kill':
+                try:
+                    pulse.kill_client(self.selected[0].pa.client.index)
+                except:
+                    if type(self.selected[0].pa) is PulseSinkInputInfo:
+                        pulse.kill_sink(self.selected[2])
+                    else:
+                        pulse.kill_source(self.selected[2])
             elif self.action == 'Suspend':
                 if type(self.selected[0].pa) is PulseSinkInfo:
                     pulse.sink_suspend(self.selected[2], 1)
