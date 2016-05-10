@@ -1211,6 +1211,7 @@ class Screen():
         environ['ESCDELAY'] = '25'
         self.screen = curses.initscr()
         self.screen.timeout(1000)
+        self.screen.scrollok(1)
         try:
             curses.curs_set(0)
         except:  # terminal doesn't support visibility requests
@@ -1255,8 +1256,9 @@ class Screen():
         shift = 0
         for s in line.split('\n'):
             p = s.rsplit('|')
-            self.screen.addstr(index, shift, ''.join(p[:-1]), int(p[-1]) | mod)
-            shift += len(''.join(p[:-1]))
+            p1 = ''.join(p[:-1])
+            self.screen.addstr(index, shift, p1, int(p[-1]) | mod)
+            shift += len(p1)
 
     def change_mode(self, mode):
         if not self.change_mode_allowed:
@@ -1319,7 +1321,7 @@ class Screen():
             self.helpwin_show = False
             self.screen.refresh()
         self.lines = curses.LINES - 2
-        self.cols = curses.COLS
+        self.cols = curses.COLS - 2
 
     def run(self, scr):
         signal.signal(signal.SIGINT, lambda signal, frame: sys.exit(0))
@@ -1647,7 +1649,7 @@ class Screen():
             vol = ''.join(vol)
             if bartype is Bar.LEFT:
                 if bar.pa.name in (self.server.default_sink_name, self.server.default_source_name):
-                    tree = '▶'
+                    tree = '*'
                 name = bar.name
                 if len(bar.name) > 20 + off:
                     name = bar.name[:20 + off] + '..'
