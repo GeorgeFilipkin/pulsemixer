@@ -1495,6 +1495,7 @@ class Screen():
                     if self.selected[0].pa.active_port.name == i.name:
                         self.submenu_data[-1] = " {}|{}".format(self.submenu_data[-1], self.red)
                 self.focus_line_num = self.top_line_num = 0
+                self.n_lines = len(self.submenu_data)
                 return
             else:
                 if type(self.selected[0].pa) is PulseSinkInfo:
