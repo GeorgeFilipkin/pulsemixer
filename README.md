@@ -34,6 +34,7 @@ pulsemixer --get-volume --change-volume +5 --get-volume
 ```
 
 If no arguments given - interactive mode is used. Which looks like this:
+
 ![Image of whatever](../img//scrn.png?raw=true)
 
 And has the following controls:
@@ -51,6 +52,29 @@ And has the following controls:
 ```
 
 Via context menu it is possible to `set-default-sink`, `set-default-source`, `move-sink-input`, `move-source-output`, `suspend-sink`, `suspend-source`, `set-sink-port`, `set-source-port`, `kill-client`, `kill-sink-input`, `kill-source-output`. See `man pactl` for details on these features.
+
+The volume bar's appearance can be changed with the environment variable PULSEMIXER_BAR_STYLE.
+
+The bar characters are defined as:
+```
+PULSEMIXER_BAR_STYLE="xxxxxxxxxxx"
+                      |||||||||||
+top left corner      -+||||||||||
+left side (mono)     --+|||||||||
+top right corner     ---+||||||||
+right side (mono)    ----+|||||||
+bottom left corner   -----+||||||
+bottom right corner  ------+|||||
+bar segment (on)     -------+||||
+bar segment (off)    --------+|||
+channel (deselected) ---------+||
+channel (selected)   ----------+|
+channel (linked)     -----------+
+```
+To set the bar style in (e.g.) zsh:
+```
+export PULSEMIXER_BAR_STYLE="┌╶┐╴└┘♥  ◆┆"
+```
 
 ## License
 This project is licensed under the terms of the MIT license
