@@ -24,7 +24,7 @@ import curses
 import re
 import getopt
 import signal
-from os import environ
+from os import environ, getenv
 from pprint import pprint
 
 #########################################################################################
@@ -39,6 +39,18 @@ PA_VOLUME_NORM = 65536
 PA_CHANNELS_MAX = 32
 PA_USEC_T = c_uint64
 
+bar_style = getenv('PULSEMIXER_BAR_STYLE', '┌╶┐╴└┘⬛- ──').ljust(11, '?')
+BAR_TOP_LEFT       = bar_style[0]
+BAR_LEFT_MONO      = bar_style[1]
+BAR_TOP_RIGHT      = bar_style[2]
+BAR_RIGHT_MONO     = bar_style[3]
+BAR_BOTTOM_LEFT    = bar_style[4]
+BAR_BOTTOM_RIGHT   = bar_style[5]
+BAR_ON             = bar_style[6]
+BAR_OFF            = bar_style[7]
+ARROW              = bar_style[8]
+ARROW_FOCUSED      = bar_style[9]
+ARROW_LOCKED       = bar_style[10]
 
 class PA_MAINLOOP(Structure):
     pass
@@ -1612,28 +1624,28 @@ class Screen():
                     if bar.stream_index == bar.owned:
                         tree = ' └─'
                 if bar.channels != 1:
-                    brackets = ['┌', '┐']
+                    brackets = [BAR_TOP_LEFT, BAR_TOP_RIGHT]
                 else:
-                    brackets = ['╶', '╴']
+                    brackets = [BAR_LEFT_MONO, BAR_RIGHT_MONO]
             elif bartype == bar.channels - 1:
                 if bar.stream_index == bar.owned:
                     tree = ' '
-                brackets = ['└', '┘']
+                brackets = [BAR_BOTTOM_LEFT, BAR_BOTTOM_RIGHT]
             else:
                 if bar.stream_index == bar.owned:
                     tree = ' '
                 brackets = ['├', '┤']
 
             # focus current lines
-            focus_hi, bracket_hi, arrow = 0, 0, ''
+            focus_hi, bracket_hi, arrow = 0, 0, ARROW
             if index == self.focus_line_num:
                 focus_hi = bracket_hi = curses.A_BOLD
-                arrow = '─'
+                arrow = ARROW_FOCUSED
             elif bar in same:
                 focus_hi = curses.A_BOLD
                 if bar.locked:
                     bracket_hi = curses.A_BOLD
-                    arrow = '─'
+                    arrow = ARROW_LOCKED
 
             # highlight chosen sink/source or muted
             if not self.change_mode_allowed and self.selected[0].owner == self.data[index][0].index:
@@ -1644,9 +1656,9 @@ class Screen():
 
             off = 6 * (self.cols // 40) - len(tree)
             cols = self.cols - 32 - off - len(tree)
-            vol = list('-' * (cols - (cols % 3 != 0)))
+            vol = list(BAR_OFF * (cols - (cols % 3 != 0)))
             n = int(len(vol) * bar.volume[bartype] / bar.maxsize)
-            vol[:n] = '⬛' * n
+            vol[:n] = BAR_ON * n
             vol = ''.join(vol)
             if bartype is Bar.LEFT:
                 if bar.pa.name in (self.server.default_sink_name, self.server.default_source_name):
