@@ -46,13 +46,14 @@ And has the following controls:
   m                             mute/unmute
   Space                         lock/unlock channels together
   Enter                         context menu
-  F1/F2                         change modes
+  F1/F2/F3                      change modes
   Tab                           go to next mode
   q/Esc/^C                      quit
 ```
 
-Via context menu it is possible to `set-default-sink`, `set-default-source`, `move-sink-input`, `move-source-output`, `suspend-sink`, `suspend-source`, `set-sink-port`, `set-source-port`, `kill-client`, `kill-sink-input`, `kill-source-output`. See `man pactl` for details on these features.
+Via context menu it is possible to `set-default-sink`, `set-default-source`, `move-sink-input`, `move-source-output`, `suspend-sink`, `suspend-source`, `set-sink-port`, `set-source-port`, `kill-client`, `kill-sink-input`, `kill-source-output`, `set-card-profile`. See `man pactl` for details on these features.
 
+#### Customizing:
 The volume bar's appearance can be changed with the environment variable PULSEMIXER_BAR_STYLE.
 
 The bar characters are defined as:
