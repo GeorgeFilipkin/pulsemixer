@@ -40,7 +40,7 @@ PA_VOLUME_NORM = 65536
 PA_CHANNELS_MAX = 32
 PA_USEC_T = c_uint64
 
-bar_style = getenv('PULSEMIXER_BAR_STYLE', '┌╶┐╴└┘⬛- ──').ljust(11, '?')
+bar_style = getenv('PULSEMIXER_BAR_STYLE', '┌╶┐╴└┘▮- ──').ljust(11, '?')
 BAR_TOP_LEFT       = bar_style[0]
 BAR_LEFT_MONO      = bar_style[1]
 BAR_TOP_RIGHT      = bar_style[2]
