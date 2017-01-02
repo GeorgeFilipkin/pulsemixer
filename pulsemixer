@@ -1264,7 +1264,10 @@ class Screen():
         for s in line.split('\n'):
             p = s.rsplit('|')
             p1 = ''.join(p[:-1])
-            self.screen.addstr(index, shift, p1, int(p[-1]) | mod)
+            try:
+                self.screen.addstr(index, shift, p1, int(p[-1]) | mod)
+            except:
+                self.screen.addstr(min(curses.LINES - 1, index), min(curses.COLS - 1, shift), p1, int(p[-1]) | mod)
             shift += len(p1)
 
     def change_mode(self, mode):
