@@ -7,6 +7,11 @@ cli and curses mixer for pulseaudio
 
 No dbus, no additional pulseaudio configuration is required.
 
+#### Installation:
+`pip3 install git+https://github.com/GeorgeFilipkin/pulsemixer.git`
+
+Or just download pulsemixer manually, do `chmod +x ./pulsemixer` and put it anywhere you want.
+
 #### Usage:
 ```
 Usage of pulsemixer:
@@ -35,7 +40,8 @@ pulsemixer --get-volume --change-volume +5 --get-volume
 
 If no arguments given - interactive mode is used. Which looks like this:
 
-![Image of whatever](../img//scrn.png?raw=true)
+![Image of 1](../img/1.png?raw=true)
+![Image of 2](../img/2.png?raw=true)
 
 And has the following controls:
 ```
