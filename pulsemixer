@@ -1773,7 +1773,7 @@ def main():
     global pulse
     pulse = Pulse('pulsemixer', server)
 
-    if len(sys.argv) == 1 or (len(dopts) == 1 and server):
+    if sys.stdout.isatty() and (len(sys.argv) == 1 or (len(dopts) == 1 and server)):
         curses.wrapper(Screen().run)
 
     sinks = pulse.sink_list()
