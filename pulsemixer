@@ -1387,7 +1387,7 @@ class Screen():
                     self.modes[5][2] = self.top_line_num
                     self.focus_line_num = self.top_line_num = 0
                     self.n_lines = len(self.submenu_data)
-                    self.submenu_width = min(self.cols - 2, max(30, len(max(self.submenu_data, key=len)) + 1))
+                    self.submenu_width = min(self.cols - 2, max(30, len(max(self.submenu_data, key=len)) + 3))
                     self.submenu_data = [s[:self.submenu_width - 1] for s in self.submenu_data]
                 elif not self.change_mode_allowed:
                     self.submenu_show = False
@@ -1505,8 +1505,8 @@ class Screen():
                 self.submenu_data = []
                 for i in self.selected[0].pa.ports:
                     s = i.description.decode().strip('|')
-                    if len(s) > 29:
-                        s = s[:26] + '..'
+                    if len(s) > 26:
+                        s = s[:23] + '..'
                     self.submenu_data.append(s)
                     if self.selected[0].pa.active_port.name == i.name:
                         self.submenu_data[-1] = " {}|{}".format(self.submenu_data[-1], self.red)
@@ -1726,11 +1726,16 @@ class Screen():
         self.submenu.resize(curses.LINES, self.submenu_width + 1)
         self.submenu.vline(0, self.submenu_width, curses.ACS_VLINE, self.lines + 2)
         for index, line in enumerate(self.submenu_data[top:bottom]):
-            focus_hi = curses.A_BOLD if index == self.focus_line_num else curses.A_NORMAL
-            if '|' in line:
-                self.display_line(index, line, focus_hi)
+            if index == self.focus_line_num:
+                focus_hi = curses.A_BOLD
+                arrow = ARROW_FOCUSED
             else:
-                self.submenu.addstr(index, 1, line, focus_hi)
+                focus_hi = curses.A_NORMAL
+                arrow = ' '
+            if '|' in line:
+                self.display_line(index, ' ' + arrow + line, focus_hi)
+            else:
+                self.submenu.addstr(index, 1, arrow + ' ' + line, focus_hi)
         self.submenu.refresh()
 
     def scroll(self, n):
