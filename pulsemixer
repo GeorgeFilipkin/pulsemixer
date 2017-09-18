@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 '''Usage of pulsemixer:
-  -h, --help               show this help message and exit
-  -v, --version            print version
-  -l, --list               list everything
-  --list-sources           list sources
-  --list-sinks             list sinks
-  --id ID                  specify ID. If no ID specified - default sink is used
-  --set-volume n           set volume for ID
-  --set-volume-all n:n     set volume for ID (for every channel)
-  --change-volume +-n      change volume for ID
-  --get-mute               get mute for ID
-  --toggle-mute            toggle mute for ID
-  --get-volume             get volume for ID
-  --mute                   mute ID
-  --unmute                 unmute ID
-  --server                 choose the server to connect to'''
+  -h, --help            show this help message and exit
+  -v, --version         print version
+  -l, --list            list everything
+  --list-sources        list sources
+  --list-sinks          list sinks
+  --id ID               specify ID. If no ID specified - default sink is used
+  --set-volume n        set volume for ID
+  --set-volume-all n:n  set volume for ID (for every channel)
+  --change-volume +-n   change volume for ID
+  --get-mute            get mute for ID
+  --toggle-mute         toggle mute for ID
+  --get-volume          get volume for ID
+  --mute                mute ID
+  --unmute              unmute ID
+  --server              choose the server to connect to
+  --color n             0 no color, 1 color currently selected, 2 full-color (default)'''
 
 VERSION = '1.2.0'
 
@@ -1213,7 +1214,7 @@ class Screen():
              Bar.RRIGHT: 'Rear Right', Bar.CENTER: 'Center', Bar.SUB: 'Subwoofer',
              Bar.SLEFT: 'Side left', Bar.SRIGHT: 'Side right'}
 
-    def __init__(self):
+    def __init__(self, color=3):
         environ['ESCDELAY'] = '25'
         self.screen = curses.initscr()
         self.screen.timeout(1000)
@@ -1234,17 +1235,41 @@ class Screen():
         self.old_mode = 0
         self.change_mode_allowed = True
         self.n_lines, self.n_lines_info = 0, 0
-        curses.start_color()
-        curses.use_default_colors()
-        curses.init_pair(1, curses.COLOR_GREEN, -1)
-        curses.init_pair(2, curses.COLOR_YELLOW, -1)
-        curses.init_pair(3, curses.COLOR_RED, -1)
-        self.green = curses.color_pair(1)
-        self.yellow = curses.color_pair(2)
-        self.red = curses.color_pair(3)
-        n = 7 if curses.COLORS < 256 else 67
-        curses.init_pair(n, n - 1, -1)
-        self.muted_color = curses.color_pair(n)
+        self.color_mode = color
+        if color in (1, 2) and curses.has_colors():
+            curses.start_color()
+            curses.use_default_colors()
+            curses.init_pair(1, curses.COLOR_GREEN, -1)
+            curses.init_pair(2, curses.COLOR_YELLOW, -1)
+            curses.init_pair(3, curses.COLOR_RED, -1)
+            self.green = curses.color_pair(1)
+            self.yellow = curses.color_pair(2)
+            self.red = curses.color_pair(3)
+            n = 7 if curses.COLORS < 256 else 67
+            curses.init_pair(n, n - 1, -1)
+            self.muted_color = curses.color_pair(n)
+            if curses.COLORS < 256:
+                self.gray_gradient = [curses.A_NORMAL] * 3
+            else:
+                try:
+                    curses.init_pair(240, 240, -1)
+                    curses.init_pair(243, 243, -1)
+                    curses.init_pair(246, 246, -1)
+                    self.gray_gradient = [
+                        curses.color_pair(240),
+                        curses.color_pair(243),
+                        curses.color_pair(246),
+                    ]
+                except:
+                    self.gray_gradient = [curses.A_NORMAL] * 3
+        else:
+            # if term has colors start them regardless of --color to avoid weird backgrounds
+            # on some terminals
+            if curses.has_colors():
+                curses.start_color()
+                curses.use_default_colors()
+            self.gray_gradient = [curses.A_NORMAL] * 3
+            self.green = self.yellow = self.red = self.muted_color = curses.A_NORMAL
         self.gradient = [self.green, self.yellow, self.red]
         self.submenu_data = []
         self.submenu_width = 30
@@ -1644,7 +1669,7 @@ class Screen():
                 brackets = ['├', '┤']
 
             # focus current lines
-            focus_hi, bracket_hi, arrow = 0, 0, ARROW
+            focus_hi, bracket_hi, arrow, gradient = 0, 0, ARROW, self.gradient
             if index == self.focus_line_num:
                 focus_hi = bracket_hi = curses.A_BOLD
                 arrow = ARROW_FOCUSED
@@ -1653,6 +1678,8 @@ class Screen():
                 if bar.locked:
                     bracket_hi = curses.A_BOLD
                     arrow = ARROW_LOCKED
+            elif not bar.muted and self.color_mode != 2:
+                gradient = self.gray_gradient
 
             # highlight chosen sink/source or muted
             if not self.change_mode_allowed and self.selected[0].owner == self.data[index][0].index:
@@ -1687,7 +1714,7 @@ class Screen():
             else:
                 volbar = ''
                 for i, v in enumerate(re.findall('.{{{}}}'.format((len(vol) // 3)), vol)):
-                    volbar += '\n{}|{}'.format(v, self.gradient[i] | focus_hi)
+                    volbar += '\n{}|{}'.format(v, gradient[i] | focus_hi)
             line += '{:>1}|{}\n{}|{}{}\n{}|{}\n{}|{}'.format(arrow, curses.A_BOLD,
                                                              brackets[0], bracket_hi,
                                                              volbar,
@@ -1766,8 +1793,8 @@ def main():
     try:
         opts, args = getopt.getopt(
             sys.argv[1:], "hvl",
-            ["help", "version", "server=", "list", "list-sinks", "list-sources", "id=",
-             "set-volume=", "set-volume-all=", "change-volume=", "get-volume",
+            ["help", "version", "color=", "server=", "list", "list-sinks", "list-sources",
+             "id=", "set-volume=", "set-volume-all=", "change-volume=", "get-volume",
              "get-mute", "toggle-mute", "mute", "unmute"])
     except getopt.GetoptError as err:
         sys.exit("ERR: {}".format(err))
@@ -1775,11 +1802,19 @@ def main():
 
     dopts = dict(opts)
     server = dopts.get('--server', '').encode() or None
+    try:
+        color = min(2, max(0, int(dopts.get('--color', '') or 2)))
+    except:
+        sys.exit('ERR: color must be a number')
     global pulse
     pulse = Pulse('pulsemixer', server)
 
-    if sys.stdout.isatty() and (len(sys.argv) == 1 or (len(dopts) == 1 and server)):
-        curses.wrapper(Screen().run)
+
+    noninteractive_opts = dict(dopts)
+    noninteractive_opts.pop('--server', None)
+    noninteractive_opts.pop('--color', None)
+    if sys.stdout.isatty() and not noninteractive_opts:
+        curses.wrapper(Screen(color=color).run)
 
     sinks = pulse.sink_list()
     sink_inputs = pulse.sink_input_list()
@@ -1801,7 +1836,10 @@ def main():
             sys.exit(print(VERSION))
 
         elif opt == '--id':
-            index = int(arg)
+            try:
+                index = int(arg)
+            except:
+                sys.exit('ERR: id must be a number')
             check_id(index)
 
         elif opt in ('-l', '--list'):
