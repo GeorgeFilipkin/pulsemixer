@@ -1809,12 +1809,14 @@ def main():
     global pulse
     pulse = Pulse('pulsemixer', server)
 
-
     noninteractive_opts = dict(dopts)
     noninteractive_opts.pop('--server', None)
     noninteractive_opts.pop('--color', None)
-    if sys.stdout.isatty() and not noninteractive_opts:
-        curses.wrapper(Screen(color=color).run)
+    if not noninteractive_opts:
+        if sys.stdout.isatty():
+            curses.wrapper(Screen(color=color).run)
+        else:
+            sys.exit('ERR: output is not a tty-like device')
 
     sinks = pulse.sink_list()
     sink_inputs = pulse.sink_input_list()
