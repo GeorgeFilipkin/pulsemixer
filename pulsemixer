@@ -17,7 +17,7 @@
   --server              choose the server to connect to
   --color n             0 no color, 1 color currently selected, 2 full-color (default)'''
 
-VERSION = '1.2.0'
+VERSION = '1.3.0'
 
 from ctypes import *
 import sys
