@@ -30,6 +30,7 @@ Usage of pulsemixer:
   --mute                   mute ID
   --unmute                 unmute ID
   --server                 choose the server to connect to
+  --color n                0 no color, 1 color currently selected, 2 full-color (default)
 ```
 It is possible to repeat arguments:
 ```
