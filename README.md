@@ -12,7 +12,7 @@ No dbus, no additional pulseaudio configuration is required.
 
 Or just download pulsemixer manually, do `chmod +x ./pulsemixer` and put it anywhere you want.
 
-#### Usage:
+#### CLI usage:
 ```
 Usage of pulsemixer:
   -h, --help               show this help message and exit
@@ -38,13 +38,23 @@ pulsemixer --get-volume --change-volume +5 --get-volume
 65 65
 70 70
 ```
+**Note on `--id`:** `--id` must be specified before the set/get/mute command, i.e. `pulsemixer --id 470 --get-volume`. If `--id` isn't specified of specified after the command, then that command will use default sink.
 
-If no arguments given - interactive mode is used. Which looks like this:
+It is not the most common cli behavior (and may be changed in the future), but it was done to avoid consecutive calls to pulsemixer, to chain commands with a single call. For example you could do this:
+```
+pulsemixer --id 470 --get-volume --id 2 --get-volume --change-volume +5 --get-volume
+90 90
+100 100
+105 105
+```
+
+#### Interactive mode:
+Interactive mode is used when no arguments were given (except `--color` and `--server`)
 
 ![Image of 1](../img/1.png?raw=true)
 ![Image of 2](../img/2.png?raw=true)
 
-And has the following controls:
+Interactive controls:
 ```
   h/j/k/l                       navigation, volume change
   arrows                        navigation, volume change
