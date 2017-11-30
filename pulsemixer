@@ -1213,6 +1213,13 @@ class Screen():
     SIDES = {Bar.LEFT: 'Left', Bar.RIGHT: 'Right', Bar.RLEFT: 'Rear Left',
              Bar.RRIGHT: 'Rear Right', Bar.CENTER: 'Center', Bar.SUB: 'Subwoofer',
              Bar.SLEFT: 'Side left', Bar.SRIGHT: 'Side right'}
+    SEQ_TO_KEY = {
+        (91, 49, 59, 50, 67): curses.KEY_SRIGHT,
+        (91, 49, 59, 50, 68): curses.KEY_SLEFT,
+        (79, 80, -1, -1, -1): curses.KEY_F1,
+        (79, 81, -1, -1, -1): curses.KEY_F2,
+        (79, 82, -1, -1, -1): curses.KEY_F3,
+    }
 
     def __init__(self, color=3):
         environ['ESCDELAY'] = '25'
@@ -1387,6 +1394,18 @@ class Screen():
             bar, side = self.data[focus][0], self.data[focus][1]
 
             c = self.screen.getch()
+            if c == -1:
+                continue
+
+            if c == 27:
+                # translating key-sequences to keys recognized by curses
+                l = []
+                self.screen.timeout(0)
+                for i in range(5):
+                    l.append(self.screen.getch())
+                self.screen.timeout(1000)
+                c = self.SEQ_TO_KEY.get(tuple(l), 27)
+
             if c == curses.KEY_F1:
                 self.change_mode(0)
             elif c == curses.KEY_F2:
