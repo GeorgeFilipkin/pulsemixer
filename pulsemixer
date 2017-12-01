@@ -15,7 +15,8 @@
   --mute                mute ID
   --unmute              unmute ID
   --server              choose the server to connect to
-  --color n             0 no color, 1 color currently selected, 2 full-color (default)'''
+  --color n             0 no color, 1 color currently selected, 2 full-color (default)
+  --no-mouse            disable mouse support'''
 
 VERSION = '1.3.0'
 
@@ -1842,15 +1843,17 @@ def main():
     try:
         opts, args = getopt.getopt(
             sys.argv[1:], "hvl",
-            ["help", "version", "color=", "server=", "list", "list-sinks", "list-sources",
-             "id=", "set-volume=", "set-volume-all=", "change-volume=", "get-volume",
-             "get-mute", "toggle-mute", "mute", "unmute"])
+            ["help", "version", "list", "list-sinks", "list-sources", "id=",
+             "set-volume=", "set-volume-all=", "change-volume=", "get-volume",
+             "get-mute", "toggle-mute", "mute", "unmute",
+             "color=", "server=", "no-mouse"])
     except getopt.GetoptError as err:
         sys.exit("ERR: {}".format(err))
     assert args == [], sys.exit('ERR: {} not not recognized'.format(' '.join(args).strip()))
 
     dopts = dict(opts)
     server = dopts.get('--server', '').encode() or None
+    mouse = True if '--no-mouse' not in dopts else False
     try:
         color = min(2, max(0, int(dopts.get('--color', '') or 2)))
     except:
@@ -1861,9 +1864,10 @@ def main():
     noninteractive_opts = dict(dopts)
     noninteractive_opts.pop('--server', None)
     noninteractive_opts.pop('--color', None)
+    noninteractive_opts.pop('--no-mouse', None)
     if not noninteractive_opts:
         if sys.stdout.isatty():
-            curses.wrapper(Screen(color=color).run)
+            curses.wrapper(Screen(color, mouse).run)
         else:
             sys.exit('ERR: output is not a tty-like device')
 
