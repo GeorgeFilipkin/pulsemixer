@@ -1206,6 +1206,9 @@ class Bar():
 class Screen():
     DOWN = 1
     UP = -1
+    SCROLL_UP = getattr(curses, 'BUTTON4_PRESSED', 0)
+    SCROLL_DOWN = getattr(curses, 'BUTTON5_PRESSED', getattr(curses, 'A_LOW', 0))
+    KEY_MOUSE = getattr(curses, 'KEY_MOUSE', 0)
     SPACE_KEY = 32
     ESC_KEY = 27
     MODE = {0: 1, 1: 0, 2: 0}
@@ -1221,11 +1224,23 @@ class Screen():
         (79, 82, -1, -1, -1): curses.KEY_F3,
     }
 
-    def __init__(self, color=3):
+    def __init__(self, color=3, mouse=True):
         environ['ESCDELAY'] = '25'
         self.screen = curses.initscr()
-        self.screen.timeout(1000)
+        self.screen.timeout(900)
         self.screen.scrollok(1)
+        if mouse:
+            # check if everything is available for click and scroll support
+            if not all([
+                hasattr(curses, 'getmouse'),
+                self.KEY_MOUSE,
+                self.SCROLL_UP,
+                self.SCROLL_DOWN,
+                curses.mousemask(curses.BUTTON1_CLICKED | self.SCROLL_UP | self.SCROLL_DOWN)
+            ]):
+                self.KEY_MOUSE = 0
+        else:
+            self.KEY_MOUSE = 0
         try:
             curses.curs_set(0)
         except:  # terminal doesn't support visibility requests
@@ -1283,7 +1298,7 @@ class Screen():
         self.submenu_show = False
         self.submenu = curses.newwin(curses.LINES, 0, 0, 0)
         self.helpwin_show = False
-        self.helpwin = curses.newwin(12, 62, 0, 0)
+        self.helpwin = curses.newwin(13, 62, 0, 0)
         try:
             self.helpwin.mvwin((curses.LINES // 2) - 6, (curses.COLS // 2) - 31)
         except:
@@ -1359,12 +1374,24 @@ class Screen():
             y, x = self.screen.getmaxyx()
             curses.resizeterm(y, x)
             self.submenu.resize(curses.LINES, self.submenu_width + 1)
-            self.helpwin.resize(12, 62)
+            self.helpwin.resize(13, 62)
             self.helpwin.mvwin((curses.LINES // 2) - 6, (curses.COLS // 2) - 31)
             self.helpwin_show = False
             self.screen.refresh()
         self.lines = curses.LINES - 2
         self.cols = curses.COLS - 2
+
+    def run_mouse(self):
+        try:
+            _, _, y, _, c = curses.getmouse()
+            if c & curses.BUTTON1_CLICKED:
+                top, bottom = self.top_line_num, len(self.data[self.top_line_num:self.top_line_num + self.lines]) - 1
+                self.focus_line_num = max(top, min(bottom, y - 1))
+                # n = y - self.focus_line_num - 1
+                # [self.scroll(max(self.UP, min(self.DOWN, n))) for _ in range(abs(n))]
+            return c
+        except curses.error:
+            return None
 
     def run(self, scr):
         signal.signal(signal.SIGINT, lambda signal, frame: sys.exit(0))
@@ -1394,16 +1421,18 @@ class Screen():
             bar, side = self.data[focus][0], self.data[focus][1]
 
             c = self.screen.getch()
+
             if c == -1:
                 continue
-
-            if c == 27:
+            elif c == self.KEY_MOUSE:
+                c = self.run_mouse() or c
+            elif c == 27:
                 # translating key-sequences to keys recognized by curses
                 l = []
                 self.screen.timeout(0)
                 for i in range(5):
                     l.append(self.screen.getch())
-                self.screen.timeout(1000)
+                self.screen.timeout(900)
                 c = self.SEQ_TO_KEY.get(tuple(l), 27)
 
             if c == curses.KEY_F1:
@@ -1490,9 +1519,9 @@ class Screen():
                 bar.mute_toggle()
             elif c == self.SPACE_KEY:
                 bar.lock_toggle()
-            elif c == curses.KEY_LEFT or c == ord('h'):
+            elif c == curses.KEY_LEFT or c == ord('h') or c & self.SCROLL_DOWN:
                 bar.move(-1, side)
-            elif c == curses.KEY_RIGHT or c == ord('l'):
+            elif c == curses.KEY_RIGHT or c == ord('l') or c & self.SCROLL_UP:
                 bar.move(1, side)
             elif c == curses.KEY_SLEFT or c == ord('H'):
                 bar.move(-10, side)
@@ -1744,8 +1773,7 @@ class Screen():
         self.screen.refresh()
 
     def display_helpwin(self):
-        '''h/j/k/l                       navigation, volume change
-          arrows                        navigation, volume change
+        '''h/j/k/l, arrows               navigation, volume change
           H/L, Shift+Left/Shift+Right   change volume by 10
           1/2/3/4/5/6/7/8/9/0           set volume to 10%-100%
           m                             mute/unmute
@@ -1753,6 +1781,8 @@ class Screen():
           Enter                         context menu
           F1/F2/F3                      change modes
           Tab                           go to next mode
+          Mouse left click              select device
+          Mouse wheel                   volume change
           q/Esc/^C                      quit'''
         self.helpwin.erase()
         self.helpwin.border()
