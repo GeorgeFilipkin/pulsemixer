@@ -1867,6 +1867,8 @@ def main():
     noninteractive_opts.pop('--no-mouse', None)
     if not noninteractive_opts:
         if sys.stdout.isatty():
+            sys.stdout.write('\033]2;pulsemixer\007')
+            sys.stdout.flush()
             curses.wrapper(Screen(color, mouse).run)
         else:
             sys.exit('ERR: output is not a tty-like device')
