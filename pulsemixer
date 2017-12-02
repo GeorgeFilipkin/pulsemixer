@@ -1867,7 +1867,8 @@ def main():
     noninteractive_opts.pop('--no-mouse', None)
     if not noninteractive_opts:
         if sys.stdout.isatty():
-            sys.stdout.write('\033]2;pulsemixer\007')
+            title = 'pulsemixer {}'.format(server.decode() if server else '')
+            sys.stdout.write('\033]2;{}\007'.format(title.strip()))
             sys.stdout.flush()
             curses.wrapper(Screen(color, mouse).run)
         else:
