@@ -1252,6 +1252,7 @@ class Screen():
         self.focus_line_num = 0
         self.lines, self.cols = curses.LINES - 1, curses.COLS - 1
         self.info, self.menu = str, str
+        self.menu_titles = ['F1 Output', 'F2 Input', 'F3 Cards']
         self.data = []
         self.modes = [[[], 0, 0] for i in range(6)]
         self.active_mode = 0
@@ -1340,9 +1341,9 @@ class Screen():
     def update_menu(self):
         if self.change_mode_allowed:
             self.menu = '{}|{}\n  {}|{}\n  {}|{}\n {:>{}}|{}'.format(
-                "F1 Output", curses.A_BOLD if self.MODE[0] else curses.A_DIM,
-                "F2 Input", curses.A_BOLD if self.MODE[1] else curses.A_DIM,
-                "F3 Cards", curses.A_BOLD if self.MODE[2] else curses.A_DIM,
+                self.menu_titles[0], curses.A_BOLD if self.MODE[0] else curses.A_DIM,
+                self.menu_titles[1], curses.A_BOLD if self.MODE[1] else curses.A_DIM,
+                self.menu_titles[2], curses.A_BOLD if self.MODE[2] else curses.A_DIM,
                 "? - help", self.cols - 32, curses.A_DIM)
         else:
             select = 'output' if type(self.selected[0].pa) is PulseSinkInputInfo else 'input'
@@ -1384,12 +1385,21 @@ class Screen():
 
     def run_mouse(self):
         try:
-            _, _, y, _, c = curses.getmouse()
+            _, x, y, _, c = curses.getmouse()
             if c & curses.BUTTON1_CLICKED:
-                top, bottom = self.top_line_num, len(self.data[self.top_line_num:self.top_line_num + self.lines]) - 1
-                self.focus_line_num = max(top, min(bottom, y - 1))
-                # n = y - self.focus_line_num - 1
-                # [self.scroll(max(self.UP, min(self.DOWN, n))) for _ in range(abs(n))]
+                if y > 0:
+                    top, bottom = self.top_line_num, len(self.data[self.top_line_num:self.top_line_num + self.lines]) - 1
+                    self.focus_line_num = max(top, min(bottom, y - 1))
+                else:
+                    f1 = len(self.menu_titles[0]) + 1 # 1 is 'spacing' after the title
+                    f2 = f1 + len(self.menu_titles[1]) + 2
+                    f3 = f2 + len(self.menu_titles[2]) + 3
+                    if x in range(0, f1):
+                        self.change_mode(0)
+                    elif x in range(f1, f2):
+                        self.change_mode(1)
+                    elif x in range(f2, f3):
+                        self.change_mode(2)
             return c
         except curses.error:
             return None
