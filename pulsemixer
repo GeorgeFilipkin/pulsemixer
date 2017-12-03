@@ -21,6 +21,7 @@
 VERSION = '1.3.0'
 
 from ctypes import *
+from time import sleep
 import sys
 import curses
 import re
@@ -294,6 +295,9 @@ PA_SERVER_INFO_CB_T = CFUNCTYPE(None,
                                 POINTER(PA_CONTEXT),
                                 POINTER(PA_SERVER_INFO),
                                 c_void_p)
+PA_CONTEXT_READY = 4
+PA_CONTEXT_FAILED = 5
+PA_CONTEXT_TERMINATED = 6
 
 pa_mainloop_new = p.pa_mainloop_new
 pa_mainloop_new.restype = POINTER(PA_MAINLOOP)
@@ -330,6 +334,10 @@ pa_context_errno.argtypes = [POINTER(PA_CONTEXT)]
 pa_context_new = p.pa_context_new
 pa_context_new.restype = POINTER(PA_CONTEXT)
 pa_context_new.argtypes = [POINTER(PA_MAINLOOP_API), c_char_p]
+
+pa_context_unref = p.pa_context_unref
+pa_context_unref.restype = None
+pa_context_unref.argtypes = [POINTER(PA_CONTEXT)]
 
 pa_context_set_state_callback = p.pa_context_set_state_callback
 pa_context_set_state_callback.restype = None
@@ -721,12 +729,16 @@ class PulseClient():
 
 class Pulse():
 
-    def __init__(self, client_name='libpulse', server=None):
+    def __init__(self, client_name='libpulse', server_name=None):
+
         self.ret = None
+        self.error = None
         self.operation = None
+        self.connected = True
         self.action_done = False
         self.data = []
         self.client_name = client_name.encode()
+        self.server_name = server_name
 
         self.pa_signal_cb = PA_SIGNAL_CB_T(self.signal_cb)
         self.pa_state_cb = PA_STATE_CB_T(self.state_cb)
@@ -742,10 +754,30 @@ class Pulse():
         self.context = pa_context_new(self.mainloop_api, self.client_name)
         pa_context_set_state_callback(self.context, self.pa_state_cb, None)
 
-        if pa_context_connect(self.context, server, 0, None) < 0:
+        if pa_context_connect(self.context, self.server_name, 0, None) < 0:
             self.disconnect()
             sys.exit("Failed to connect to pulseaudio daemon: Connection refused")
         self.iterate()
+
+    def reconnect(self):
+        self.connected = False
+        while not self.connected:
+            self.error = None
+            self.disconnect()
+
+            self.mainloop = pa_mainloop_new()
+            self.mainloop_api = pa_mainloop_get_api(self.mainloop)
+
+            self.context = pa_context_new(self.mainloop_api, self.client_name)
+            pa_context_set_state_callback(self.context, self.pa_state_cb, None)
+
+            try:
+                if pa_context_connect(self.context, self.server_name, 0, None) >= 0:
+                    self.iterate()
+                    self.connected = True
+            except:
+                pass
+            sleep(0.5)
 
     def unmute_stream(self, obj):
         if type(obj) is PulseSinkInfo:
@@ -806,12 +838,11 @@ class Pulse():
 
     def state_cb(self, c, b):
         state = pa_context_get_state(c)
-        if state == 4:
+        if state == PA_CONTEXT_READY:
             self.complete_action()
-        elif state == 5:
-            sys.exit("Failed to connect to pulseaudio daemon: Connection refused")
-        elif state == 6:
-            sys.exit(pa_context_errno(c))
+        elif state in (PA_CONTEXT_FAILED, PA_CONTEXT_TERMINATED):
+            self.error = RuntimeError("Failed to complete action: {}, {}".format(state, pa_context_errno(c)))
+            self.complete_action()
         return 0
 
     def _action_cb(func):
@@ -863,6 +894,7 @@ class Pulse():
 
     def disconnect(self):
         pa_context_disconnect(self.context)
+        pa_context_unref(self.context)
         pa_mainloop_free(self.mainloop)
 
     def sink_input_list(self):
@@ -1019,6 +1051,8 @@ class Pulse():
         pa_mainloop_run(self.mainloop, self.ret)
 
     def iterate(self, times=1, start=True):
+        if self.error:
+            raise self.error
         start and self.start_action()
         self.ret = pointer(c_int())
         pa_mainloop_iterate(self.mainloop, times, self.ret)
@@ -1404,13 +1438,30 @@ class Screen():
         except curses.error:
             return None
 
+    def sigint(self):
+        # if ^C pressed while doing pulse.reconnect wrapper.restore won't be called
+        # so have to restore it manually here
+        self.screen.keypad(0)
+        curses.echo()
+        curses.nocbreak()
+        curses.endwin()
+        sys.exit(0)
+
     def run(self, scr):
-        signal.signal(signal.SIGINT, lambda signal, frame: sys.exit(0))
+        signal.signal(signal.SIGINT, lambda signal, frame: self.sigint())
+        from ctypes import _reset_cache as reset_cache
         while True:
             try:
                 self.check_resize()
                 if not self.submenu_show:
-                    self.get_data()
+                    try:
+                        self.get_data()
+                    except RuntimeError:
+                        self.focus_line_num = 0
+                        self.data = [(Bar('PA - Connection refused.\nTrying to reconnect.'), Bar.NONE, 0)]
+                        self.display()
+                        pulse.reconnect()
+                        continue
                     self.update_menu()
                     self.update_info()
                     self.display()
@@ -1693,7 +1744,8 @@ class Screen():
                 self.screen.addstr(index + 1, 0, '', curses.A_DIM)
                 continue
             elif bartype is Bar.NONE:
-                self.screen.addstr(self.lines // 2, self.cols // 2, bar.name, curses.A_DIM)
+                for i, name in enumerate(bar.name.split('\n')):
+                    self.screen.addstr((self.lines // 2) + i, (self.cols // 2) - len(name)  // 2, name, curses.A_DIM)
                 break
 
             # hightlight lines from same bar
