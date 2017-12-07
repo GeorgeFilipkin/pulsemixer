@@ -1423,7 +1423,8 @@ class Screen():
             if c & curses.BUTTON1_CLICKED:
                 if y > 0:
                     top, bottom = self.top_line_num, len(self.data[self.top_line_num:self.top_line_num + self.lines]) - 1
-                    self.focus_line_num = max(top, min(bottom, y - 1))
+                    if y - 1 <= bottom:
+                        self.focus_line_num = max(top, min(bottom, y - 1))
                 else:
                     f1 = len(self.menu_titles[0]) + 1 # 1 is 'spacing' after the title
                     f2 = f1 + len(self.menu_titles[1]) + 2
