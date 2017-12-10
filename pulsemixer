@@ -121,7 +121,8 @@ class PA_SINK_INPUT_INFO(Structure):
         ("sink_usec",       PA_USEC_T),
         ("resample_method", c_char_p),
         ("driver",          c_char_p),
-        ("mute",            c_int)
+        ("mute",            c_int),
+        ("proplist", POINTER(PA_PROPLIST))
     ]
 
 
@@ -1101,6 +1102,7 @@ class PulseSinkInputInfo(PulseSink):
         self.client_id = pa_sink_input_info.client
         self.sink = self.owner = pa_sink_input_info.sink
         self.driver = pa_sink_input_info.driver
+        self.media_name = pa_proplist_gets(pa_sink_input_info.proplist, b'media.name')
 
     def __str__(self):
         if self.client:
@@ -1209,6 +1211,10 @@ class Bar():
         self.owned = owned
         self.stream_index = stream_index
         self.volume = pa.volume.values
+        try:
+            self.media_name = ': {}'.format(pa.media_name.decode().replace('|', ' '))
+        except:
+            self.media_name = ''
         if type(pa) in (PulseSinkInputInfo, PulseSourceOutputInfo):
             self.owner = pa.owner
         self.pa = pa
@@ -1378,7 +1384,7 @@ class Screen():
                 self.menu_titles[0], curses.A_BOLD if self.MODE[0] else curses.A_DIM,
                 self.menu_titles[1], curses.A_BOLD if self.MODE[1] else curses.A_DIM,
                 self.menu_titles[2], curses.A_BOLD if self.MODE[2] else curses.A_DIM,
-                "? - help", self.cols - 32, curses.A_DIM)
+                "? - help", self.cols - 30, curses.A_DIM)
         else:
             select = 'output' if type(self.selected[0].pa) is PulseSinkInputInfo else 'input'
             self.menu = "Select new {} device:|{}".format(select, curses.A_NORMAL)
@@ -1402,7 +1408,7 @@ class Screen():
         self.info = '{}|{}\n{}|{}\n{}|{}\n'.format(
             "L ", self.red if bar.locked else curses.A_DIM,
             "M  ", self.red if bar.muted else curses.A_DIM, name, curses.A_NORMAL)
-        self.info += '{:>{}}%|{}'.format(pos, self.cols - len(name) - 8, curses.A_BOLD)
+        self.info += '{:>{}}%|{}'.format(pos, self.cols - len(name) - 6, curses.A_BOLD)
 
     def check_resize(self):
         if curses.is_term_resized(curses.LINES, curses.COLS):
@@ -1415,7 +1421,7 @@ class Screen():
             self.helpwin_show = False
             self.screen.refresh()
         self.lines = curses.LINES - 2
-        self.cols = curses.COLS - 2
+        self.cols = curses.COLS - 1
 
     def run_mouse(self):
         try:
@@ -1746,7 +1752,7 @@ class Screen():
                 continue
             elif bartype is Bar.NONE:
                 for i, name in enumerate(bar.name.split('\n')):
-                    self.screen.addstr((self.lines // 2) + i, (self.cols // 2) - len(name)  // 2, name, curses.A_DIM)
+                    self.screen.addstr((self.lines // 2) + i, (self.cols // 2) - len(name) // 2, name, curses.A_DIM)
                 break
 
             # hightlight lines from same bar
@@ -1799,9 +1805,8 @@ class Screen():
             elif bar.muted:
                 bracket_hi = bracket_hi | self.red
                 focus_hi = focus_hi | self.muted_color
-
-            off = 6 * (self.cols // 40) - len(tree)
-            cols = self.cols - 32 - off - len(tree)
+            off = 6 * (self.cols // (43 if self.cols <= 60 else 25)) - len(tree)
+            cols = self.cols - 31 - off - len(tree)
             vol = list(BAR_OFF * (cols - (cols % 3 != 0)))
             n = int(len(vol) * bar.volume[bartype] / bar.maxsize)
             vol[:n] = BAR_ON * n
@@ -1809,7 +1814,8 @@ class Screen():
             if bartype is Bar.LEFT:
                 if bar.pa.name in (self.server.default_sink_name, self.server.default_source_name):
                     tree = '*'
-                name = bar.name[:20 + off] + '..' if len(bar.name) > 20 + off else bar.name
+                name = '{}{}'.format(bar.name, bar.media_name)
+                name = name[:20 + off] + '~' if len(name) > 20 + off else name
                 line = '{:<{}}|{}\n {:<3}|{}\n '.format(name, 22 + off, focus_hi,
                                                         '' if type(bar.pa) is PulseCard else bar.volume[0],
                                                         focus_hi)
