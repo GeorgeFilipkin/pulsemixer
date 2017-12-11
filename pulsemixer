@@ -22,6 +22,7 @@ VERSION = '1.3.0'
 
 from ctypes import *
 from time import sleep
+import operator, functools
 import sys
 import curses
 import re
@@ -1247,8 +1248,8 @@ class Bar():
 class Screen():
     DOWN = 1
     UP = -1
-    SCROLL_UP = getattr(curses, 'BUTTON4_PRESSED', 0)
-    SCROLL_DOWN = getattr(curses, 'BUTTON5_PRESSED', getattr(curses, 'A_LOW', 0))
+    SCROLL_UP = [getattr(curses, i, 0) for i in ['BUTTON4_PRESSED', 'BUTTON3_TRIPLE_CLICKED']]
+    SCROLL_DOWN = [getattr(curses, i, 0) for i in ['BUTTON5_PRESSED', 'A_LOW', 'BUTTON4_DOUBLE_CLICKED']]
     KEY_MOUSE = getattr(curses, 'KEY_MOUSE', 0)
     SPACE_KEY = 32
     ESC_KEY = 27
@@ -1271,14 +1272,13 @@ class Screen():
         self.screen.timeout(900)
         self.screen.scrollok(1)
         if mouse:
-            # check if everything is available for click and scroll support
-            if not all([
-                hasattr(curses, 'getmouse'),
-                self.KEY_MOUSE,
-                self.SCROLL_UP,
-                self.SCROLL_DOWN,
-                curses.mousemask(curses.BUTTON1_CLICKED | self.SCROLL_UP | self.SCROLL_DOWN)
-            ]):
+            try:
+                curses.mousemask(curses.ALL_MOUSE_EVENTS |
+                                 curses.BUTTON1_CLICKED |
+                                 self.KEY_MOUSE |
+                                 functools.reduce(operator.or_, list(self.SCROLL_UP)) |
+                                 functools.reduce(operator.or_, list(self.SCROLL_DOWN)))
+            except:
                 self.KEY_MOUSE = 0
         else:
             self.KEY_MOUSE = 0
@@ -1588,9 +1588,9 @@ class Screen():
                 bar.mute_toggle()
             elif c == self.SPACE_KEY:
                 bar.lock_toggle()
-            elif c == curses.KEY_LEFT or c == ord('h') or c & self.SCROLL_DOWN:
+            elif c == curses.KEY_LEFT or c == ord('h') or any([c & i for i in self.SCROLL_DOWN]):
                 bar.move(-1, side)
-            elif c == curses.KEY_RIGHT or c == ord('l') or c & self.SCROLL_UP:
+            elif c == curses.KEY_RIGHT or c == ord('l') or any([c & i for i in self.SCROLL_UP]):
                 bar.move(1, side)
             elif c == curses.KEY_SLEFT or c == ord('H'):
                 bar.move(-10, side)
