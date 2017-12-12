@@ -1249,7 +1249,7 @@ class Screen():
     DOWN = 1
     UP = -1
     SCROLL_UP = [getattr(curses, i, 0) for i in ['BUTTON4_PRESSED', 'BUTTON3_TRIPLE_CLICKED']]
-    SCROLL_DOWN = [getattr(curses, i, 0) for i in ['BUTTON5_PRESSED', 'A_LOW', 'BUTTON4_DOUBLE_CLICKED']]
+    SCROLL_DOWN = [getattr(curses, i, 0) for i in ['BUTTON5_PRESSED', 'A_LOW', 'A_BOLD', 'BUTTON4_DOUBLE_CLICKED']]
     KEY_MOUSE = getattr(curses, 'KEY_MOUSE', 0)
     SPACE_KEY = 32
     ESC_KEY = 27
