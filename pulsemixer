@@ -1416,6 +1416,10 @@ class Screen():
             y, x = self.screen.getmaxyx()
             curses.resizeterm(y, x)
             self.submenu.resize(curses.LINES, self.submenu_width + 1)
+            if self.submenu_show:
+                self.submenu_show = False
+                self.focus_line_num = self.modes[5][1]
+                self.top_line_num = self.modes[5][2]
             self.helpwin.resize(13, 62)
             self.helpwin.mvwin((curses.LINES // 2) - 6, (curses.COLS // 2) - 31)
             self.helpwin_show = False
@@ -1529,8 +1533,8 @@ class Screen():
                     self.modes[5][2] = self.top_line_num
                     self.focus_line_num = self.top_line_num = 0
                     self.n_lines = len(self.submenu_data)
-                    self.submenu_width = min(self.cols - 2, max(30, len(max(self.submenu_data, key=len)) + 3))
-                    self.submenu_data = [s[:self.submenu_width - 1] for s in self.submenu_data]
+                    self.submenu_width = min(self.cols - 2, max(30, len(max(self.submenu_data, key=len)) + 5))
+                    self.submenu_data = [s[:self.submenu_width - 4] for s in self.submenu_data]
                 elif not self.change_mode_allowed:
                     self.submenu_show = False
                     self.change_mode_allowed = True
