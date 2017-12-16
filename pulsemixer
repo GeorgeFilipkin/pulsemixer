@@ -18,7 +18,7 @@
   --color n             0 no color, 1 color currently selected, 2 full-color (default)
   --no-mouse            disable mouse support'''
 
-VERSION = '1.3.0'
+VERSION = '1.4.0'
 
 from ctypes import *
 from time import sleep
@@ -1855,7 +1855,7 @@ class Screen():
           Enter                         context menu
           F1/F2/F3                      change modes
           Tab                           go to next mode
-          Mouse left click              select device
+          Mouse left click              select device or mode
           Mouse wheel                   volume change
           q/Esc/^C                      quit'''
         self.helpwin.erase()
