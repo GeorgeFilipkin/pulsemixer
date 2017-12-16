@@ -1,36 +1,35 @@
 # pulsemixer
 cli and curses mixer for pulseaudio
 
-#### Requirements:
+### Requirements:
 - `Python` >= 3
 - `Pulseaudio` >= ?
 
-No dbus, no additional pulseaudio configuration is required.
-
-#### Installation:
+### Installation:
 `pip3 install git+https://github.com/GeorgeFilipkin/pulsemixer.git`
 
 Or just download pulsemixer manually, do `chmod +x ./pulsemixer` and put it anywhere you want.
 
-#### CLI usage:
+### CLI usage:
 ```
 Usage of pulsemixer:
-  -h, --help               show this help message and exit
-  -v, --version            print version
-  -l, --list               list everything
-  --list-sources           list sources
-  --list-sinks             list sinks
-  --id ID                  specify ID. If no ID specified - default sink is used
-  --set-volume n           set volume for ID
-  --set-volume-all n:n     set volume for ID (for every channel)
-  --change-volume +-n      change volume for ID
-  --get-mute               get mute for ID
-  --toggle-mute            toggle mute for ID
-  --get-volume             get volume for ID
-  --mute                   mute ID
-  --unmute                 unmute ID
-  --server                 choose the server to connect to
-  --color n                0 no color, 1 color currently selected, 2 full-color (default)
+  -h, --help            show this help message and exit
+  -v, --version         print version
+  -l, --list            list everything
+  --list-sources        list sources
+  --list-sinks          list sinks
+  --id ID               specify ID. If no ID specified - default sink is used
+  --set-volume n        set volume for ID
+  --set-volume-all n:n  set volume for ID (for every channel)
+  --change-volume +-n   change volume for ID
+  --get-mute            get mute for ID
+  --toggle-mute         toggle mute for ID
+  --get-volume          get volume for ID
+  --mute                mute ID
+  --unmute              unmute ID
+  --server              choose the server to connect to
+  --color n             0 no color, 1 color currently selected, 2 full-color (default)
+  --no-mouse            disable mouse support
 ```
 It is possible to repeat arguments:
 ```
@@ -48,7 +47,7 @@ pulsemixer --id 470 --get-volume --id 2 --get-volume --change-volume +5 --get-vo
 105 105
 ```
 
-#### Interactive mode:
+### Interactive mode:
 Interactive mode is used when no arguments were given (except `--color` and `--server`)
 
 ![Image of 1](../img/1.png?raw=true)
@@ -56,21 +55,22 @@ Interactive mode is used when no arguments were given (except `--color` and `--s
 
 Interactive controls:
 ```
-  h/j/k/l                       navigation, volume change
-  arrows                        navigation, volume change
+  h/j/k/l, arrows               navigation, volume change
   H/L, Shift+Left/Shift+Right   change volume by 10
-  1/2/3/4/5/6/7/8/9/0           set volume to 10%/20%/30%/40%/50%/60%/70%/80%/90%/100%
+  1/2/3/4/5/6/7/8/9/0           set volume to 10%-100%
   m                             mute/unmute
   Space                         lock/unlock channels together
   Enter                         context menu
   F1/F2/F3                      change modes
   Tab                           go to next mode
+  Mouse left click              select device or mode
+  Mouse wheel                   volume change
   q/Esc/^C                      quit
 ```
 
 Via context menu it is possible to `set-default-sink`, `set-default-source`, `move-sink-input`, `move-source-output`, `suspend-sink`, `suspend-source`, `set-sink-port`, `set-source-port`, `kill-client`, `kill-sink-input`, `kill-source-output`, `set-card-profile`. See `man pactl` for details on these features.
 
-#### Customizing:
+### Customizing:
 The volume bar's appearance can be changed with the environment variable PULSEMIXER_BAR_STYLE.
 
 The bar characters are defined as:
