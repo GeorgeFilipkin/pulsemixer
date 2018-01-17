@@ -1264,6 +1264,10 @@ class Screen():
         (79, 80, -1, -1, -1): curses.KEY_F1,
         (79, 81, -1, -1, -1): curses.KEY_F2,
         (79, 82, -1, -1, -1): curses.KEY_F3,
+        (79, 72, -1, -1, -1): curses.KEY_HOME,
+        (79, 70, -1, -1, -1): curses.KEY_END,
+        (91, 49, 126, -1, -1): curses.KEY_HOME,
+        (91, 52, 126, -1, -1): curses.KEY_END,
     }
 
     def __init__(self, color=3, mouse=True):
@@ -1565,7 +1569,7 @@ class Screen():
             if side is Bar.NONE:
                 continue
 
-            if c == curses.KEY_UP or c == ord('k'):
+            if c in (curses.KEY_UP, ord('k'), curses.KEY_PPAGE):
                 if bar.locked:
                     if self.data[focus][1] == 0:
                         n = 1
@@ -1576,7 +1580,7 @@ class Screen():
                     self.scroll(self.UP)
                 if not self.data[self.top_line_num + self.focus_line_num][0]:
                     self.scroll(self.UP)
-            elif c == curses.KEY_DOWN or c == ord('j'):
+            elif c in (curses.KEY_DOWN, ord('j'), curses.KEY_NPAGE):
                 if bar.locked:
                     if self.data[focus][1] == self.data[focus][3] - 1:
                         n = 1
@@ -1587,6 +1591,10 @@ class Screen():
                     self.scroll(self.DOWN)
                 if not self.data[self.top_line_num + self.focus_line_num][0]:
                     self.scroll(self.DOWN)
+            elif c == curses.KEY_HOME:
+                self.scroll_first()
+            elif c == curses.KEY_END:
+                self.scroll_last()
 
             elif c == ord('m'):
                 bar.mute_toggle()
@@ -1610,10 +1618,16 @@ class Screen():
             self.submenu_show = False
             self.focus_line_num = self.modes[5][1]
             self.top_line_num = self.modes[5][2]
-        elif c == curses.KEY_UP or c == ord('k'):
+
+        elif c in (curses.KEY_UP, ord('k'), curses.KEY_PPAGE):
             self.scroll(self.UP)
-        elif c == curses.KEY_DOWN or c == ord('j'):
+        elif c in (curses.KEY_DOWN, ord('j'), curses.KEY_NPAGE):
             self.scroll(self.DOWN)
+        elif c == curses.KEY_HOME:
+            self.scroll_first()
+        elif c == curses.KEY_END:
+            self.scroll_last()
+
         elif c == ord('\n'):
             focus = self.focus_line_num + self.top_line_num
             self.action = self.submenu_data[focus]
@@ -1904,6 +1918,12 @@ class Screen():
         elif n == self.DOWN and self.focus_line_num != self.lines and\
                 (self.top_line_num + self.focus_line_num + 1) != self.n_lines:
             self.focus_line_num = next_line_num
+
+    def scroll_first(self):
+        [self.scroll(self.UP) for _ in range(len(self.data))]
+
+    def scroll_last(self):
+        [self.scroll(self.DOWN) for _ in range(len(self.data))]
 
 
 def usage():
