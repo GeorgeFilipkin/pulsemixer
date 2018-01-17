@@ -3,14 +3,24 @@ cli and curses mixer for pulseaudio
 
 ### Requirements:
 - `Python` >= 3
-- `Pulseaudio` >= ?
+- `PulseAudio` >= 1.0
 
-### Installation:
-`pip3 install git+https://github.com/GeorgeFilipkin/pulsemixer.git`
+## Installation:
+##### Pip:  
+
+```
+pip3 install git+https://github.com/GeorgeFilipkin/pulsemixer.git
+```
+
+##### curl:
+
+```sh
+curl https://raw.githubusercontent.com/GeorgeFilipkin/pulsemixer/master/pulsemixer > pulsemixer && chmod +x ./pulsemixer
+```
 
 Or just download pulsemixer manually, do `chmod +x ./pulsemixer` and put it anywhere you want.
 
-### CLI usage:
+## CLI usage:
 ```
 Usage of pulsemixer:
   -h, --help            show this help message and exit
@@ -37,7 +47,7 @@ pulsemixer --get-volume --change-volume +5 --get-volume
 65 65
 70 70
 ```
-**Note on `--id`:** `--id` must be specified before the set/get/mute command, i.e. `pulsemixer --id 470 --get-volume`. If `--id` isn't specified of specified after the command, then that command will use default sink.
+**Note on id:** `--id` must be specified before the set/get/mute command, i.e. `pulsemixer --id 470 --get-volume`. If `--id` isn't specified of specified after the command, then that command will use default sink.
 
 It is not the most common cli behavior (and may be changed in the future), but it was done to avoid consecutive calls to pulsemixer, to chain commands with a single call. For example you could do this:
 ```
@@ -47,7 +57,7 @@ pulsemixer --id 470 --get-volume --id 2 --get-volume --change-volume +5 --get-vo
 105 105
 ```
 
-### Interactive mode:
+## Interactive mode:
 Interactive mode is used when no arguments were given (except `--color` and `--server`)
 
 ![Image of 1](../img/1.png?raw=true)
@@ -56,6 +66,8 @@ Interactive mode is used when no arguments were given (except `--color` and `--s
 Interactive controls:
 ```
   h/j/k/l, arrows               navigation, volume change
+  PgUp/PgDn                     navigation
+  Home/End                      select first/last device
   H/L, Shift+Left/Shift+Right   change volume by 10
   1/2/3/4/5/6/7/8/9/0           set volume to 10%-100%
   m                             mute/unmute
@@ -70,7 +82,7 @@ Interactive controls:
 
 Via context menu it is possible to `set-default-sink`, `set-default-source`, `move-sink-input`, `move-source-output`, `suspend-sink`, `suspend-source`, `set-sink-port`, `set-source-port`, `kill-client`, `kill-sink-input`, `kill-source-output`, `set-card-profile`. See `man pactl` for details on these features.
 
-### Customizing:
+## Customizing:
 The volume bar's appearance can be changed with the environment variable PULSEMIXER_BAR_STYLE.
 
 The bar characters are defined as:
