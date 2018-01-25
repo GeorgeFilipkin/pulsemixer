@@ -20,7 +20,7 @@ parts:
   pulsemixer:
     plugin: python
     python-version: python3
-    source: https://github.com/GeorgeFilipkin/pulsemixer.git
+    source: .
     stage-packages:
       - libpulse0
     filesets:
