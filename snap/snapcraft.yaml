@@ -1,0 +1,82 @@
+name: pulsemixer
+version: git
+summary: cli and curses mixer for pulseaudio
+description: |
+  cli and curses mixer for pulseaudio.
+
+confinement: strict
+
+apps:
+  pulsemixer:
+    command: launcher $SNAP/bin/pulsemixer
+    environment:
+      LC_ALL: C.UTF-8
+    plugs:
+      - network
+      - pulseaudio
+      - x11
+
+parts:
+  pulsemixer:
+    plugin: python
+    python-version: python3
+    source: .
+    stage-packages:
+      - libpulse0
+    filesets:
+      cruft_compilers_and_debuggers:
+        - -usr/bin/pdb3*
+      cruft_debhelper:
+        - -usr/bin/dh_*
+        - -usr/share/debhelper
+        - -usr/share/dh-python
+        - -usr/share/perl5/Debian
+      cruft_docs:
+        - -usr/share/doc
+        - -usr/share/doc-base
+      cruft_lintian:
+        - -usr/share/lintian/overrides
+      cruft_man_pages:
+        - -usr/share/man
+        - -share/man
+      cruft_meta:
+        - -usr/share/applications
+        - -usr/share/pixmaps
+      cruft_python_2to3:
+        - -usr/bin/2to3*
+        - -usr/lib/python*/lib2to3
+      cruft_python_idle:
+        - -usr/lib/python*/idlelib
+        - -usr/lib/python*/tkinter
+      cruft_python_pip:
+        - -lib/python*/site-packages/pip
+      cruft_python_setuptools:
+        - -lib/python*/site-packages/setuptools*
+      cruft_python_tests:
+        - -lib/python*/site-packages/tests
+      cruft_python_venv:
+        - -usr/lib/python*/venv
+      cruft_python_wheel:
+        - -lib/python*/site-packages/wheel*
+      cruft_x11:
+        - -usr/share/X11/XErrorDB
+    prime:
+      - $cruft_compilers_and_debuggers
+      - $cruft_debhelper
+      - $cruft_docs
+      - $cruft_lintian
+      - $cruft_man_pages
+      - $cruft_meta
+      - $cruft_python_2to3
+      - $cruft_python_idle
+      - $cruft_python_pip
+      - $cruft_python_setuptools
+      - $cruft_python_tests
+      - $cruft_python_venv
+      - $cruft_python_wheel
+      - $cruft_x11
+  launcher:
+    plugin: dump
+    source: snap/scripts
+    organize:
+      'launcher': bin/
