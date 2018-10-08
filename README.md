@@ -12,6 +12,18 @@ cli and curses mixer for pulseaudio
 pip3 install git+https://github.com/GeorgeFilipkin/pulsemixer.git
 ```
 
+You can also download the zip and install this locally through pip:
+
+Download and unzip:
+```
+wget https://github.com/GeorgeFilipkin/pulsemixer/archive/master.zip -O pulsemixer.zip && unzip pulsemixer.zip
+```
+
+Install locally:
+```
+pip install -e pulsemixer-master
+```
+
 ##### curl:
 
 ```sh
