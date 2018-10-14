@@ -17,6 +17,19 @@ Below are some more convenient ways to install pulsemixer:
 pip3 install pulsemixer
 ```
 
+
+If you don't have `git` installed you can download and install manually through pip:
+
+Download and unzip:
+```
+wget https://github.com/GeorgeFilipkin/pulsemixer/archive/master.zip -O pulsemixer.zip && unzip pulsemixer.zip
+```
+
+Install with pip:
+```
+pip install -e pulsemixer-master
+```
+
 ##### curl:
 
 ```sh
