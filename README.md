@@ -6,10 +6,15 @@ cli and curses mixer for pulseaudio
 - `PulseAudio` >= 1.0
 
 ## Installation:
+
+Pulsemixer is a self-sufficient single-file python script that doesn't require any extra libraries. So you can simply download [pulsemixer](https://raw.githubusercontent.com/GeorgeFilipkin/pulsemixer/master/pulsemixer) manually, do `chmod +x ./pulsemixer` and put it anywhere you want.
+
+Below are some more convenient ways to install pulsemixer:
+
 ##### Pip:  
 
 ```
-pip3 install git+https://github.com/GeorgeFilipkin/pulsemixer.git
+pip3 install pulsemixer
 ```
 
 ##### curl:
@@ -17,8 +22,6 @@ pip3 install git+https://github.com/GeorgeFilipkin/pulsemixer.git
 ```sh
 curl https://raw.githubusercontent.com/GeorgeFilipkin/pulsemixer/master/pulsemixer > pulsemixer && chmod +x ./pulsemixer
 ```
-
-Or just download pulsemixer manually, do `chmod +x ./pulsemixer` and put it anywhere you want.
 
 ## CLI usage:
 ```
@@ -60,8 +63,8 @@ pulsemixer --id 470 --get-volume --id 2 --get-volume --change-volume +5 --get-vo
 ## Interactive mode:
 Interactive mode is used when no arguments were given (except `--color` and `--server`)
 
-![Image of 1](../img/1.png?raw=true)
-![Image of 2](../img/2.png?raw=true)
+![Image of 1](https://raw.githubusercontent.com/GeorgeFilipkin/pulsemixer/img/1.png)
+![Image of 2](https://raw.githubusercontent.com/GeorgeFilipkin/pulsemixer/img/2.png)
 
 Interactive controls:
 ```
