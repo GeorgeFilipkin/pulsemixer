@@ -1653,7 +1653,7 @@ class Screen():
                         s = s[:23] + '..'
                     self.submenu_data.append(s)
                     if self.selected[0].pa.active_port.name == i.name:
-                        self.submenu_data[-1] = " {}|{}".format(self.submenu_data[-1], self.red)
+                        self.submenu_data[-1] = " {}|{}".format(self.submenu_data[-1], self.green)
                 self.focus_line_num = self.top_line_num = 0
                 self.n_lines = len(self.submenu_data)
                 return
@@ -1803,7 +1803,7 @@ class Screen():
 
             # highlight chosen sink/source or muted
             if not self.change_mode_allowed and self.selected[0].owner == self.data[index][0].index:
-                bracket_hl = self.red | bracket_hl
+                bracket_hl = self.green | bracket_hl
             elif bar.muted:
                 bracket_hl = bracket_hl | self.red
                 focus_hl = focus_hl | self.muted_color
