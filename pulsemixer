@@ -1196,7 +1196,9 @@ class Bar():
         self.stream_index = stream_index
         self.volume = pa.volume.values
         try:
-            self.media_name = ': {}'.format(pa.media_name.decode().replace('|', ' '))
+            media_name = pa.media_name.decode().replace('|', ' ')
+            if self.name != media_name:
+                self.media_name = ': {}'.format(media_name)
         except:
             self.media_name = ''
         if type(pa) in (PulseSinkInputInfo, PulseSourceOutputInfo):
