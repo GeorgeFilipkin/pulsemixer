@@ -1804,6 +1804,8 @@ class Screen():
             # highlight chosen sink/source or muted
             if not self.change_mode_allowed and self.selected[0].owner == self.data[index][0].index:
                 bracket_hl = self.green | bracket_hl
+                if bar.muted:
+                    focus_hl = focus_hl | self.muted_color
             elif bar.muted:
                 bracket_hl = bracket_hl | self.red
                 focus_hl = focus_hl | self.muted_color
