@@ -1513,6 +1513,9 @@ class Screen():
                             self.submenu_data.append('Set port')
                     elif type(self.selected[0].pa) is PulseCard:
                         self.submenu_data = [p.description.decode() for p in self.selected[0].pa.profiles]
+                        active = self.selected[0].pa.active_profile.description.decode()
+                        if active in self.submenu_data:
+                            self.submenu_data[self.submenu_data.index(active)] = ' {}|{}'.format(active, self.green)
                     else:
                         self.submenu_data = ['Move', 'Kill']
                     self.submenu_show = True
