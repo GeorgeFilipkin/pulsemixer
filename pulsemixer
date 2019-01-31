@@ -1996,6 +1996,7 @@ def main():
     check_id = lambda x: x in streams or sys.exit('ERR: No such ID: ' + str(x))
     check_id(index)
     check_n = lambda x, err: x.strip('+-').isdigit() or sys.exit('ERR: {} must be a number'.format(err))
+    print_default = lambda x, y: print(x == y and ', Default' or '')
 
     for opt, arg in opts:
         if opt == '--id':
@@ -2009,21 +2010,25 @@ def main():
             for source in source_outputs:
                 print("Source output:\t", source)
             for sink in sinks:
-                print("Sink:\t\t", sink)
+                print("Sink:\t\t", sink, end='')
+                print_default(sink.name, server_info.default_sink_name)
             for source in sources:
-                print("Source:\t\t", source)
+                print("Source:\t\t", source, end='')
+                print_default(source.name, server_info.default_source_name)
 
         elif opt == '--list-sinks':
             for sink in sink_inputs:
                 print("Sink input:\t", sink)
             for sink in sinks:
-                print("Sink:\t\t", sink)
+                print("Sink:\t\t", sink, end='')
+                print_default(sink.name, server_info.default_sink_name)
 
         elif opt == '--list-sources':
             for source in source_outputs:
                 print("Source output:\t", source)
             for source in sources:
-                print("Source:\t\t", source)
+                print("Source:\t\t", source, end='')
+                print_default(source.name, server_info.default_source_name)
 
         elif opt == '--get-mute':
             print(streams[index].mute)
