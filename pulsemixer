@@ -221,6 +221,10 @@ class PA_CARD_PROFILE_INFO(Structure):
     ]
 
 
+class PA_CARD_PROFILE_INFO2(Structure):
+    _fields_ = PA_CARD_PROFILE_INFO._fields_ + [('available',   c_int)]
+
+
 class PA_CARD_INFO(Structure):
     _fields_ = [
         ('index',           c_uint32),
@@ -231,6 +235,10 @@ class PA_CARD_INFO(Structure):
         ('profiles',        POINTER(PA_CARD_PROFILE_INFO)),
         ('active_profile',  POINTER(PA_CARD_PROFILE_INFO)),
         ('proplist',        POINTER(PA_PROPLIST)),
+        ('n_ports',         c_uint32),
+        ('ports',           POINTER(POINTER(c_void_p))),
+        ('profiles2',       POINTER(POINTER(PA_CARD_PROFILE_INFO2))),
+        ('active_profile2', POINTER(PA_CARD_PROFILE_INFO2))
     ]
 
 
@@ -690,6 +698,9 @@ class PulseCardProfile(DebugMixin):
     def __init__(self, pa_profile):
         self.name = pa_profile.name
         self.description = pa_profile.description
+        self.available = getattr(pa_profile, "available", 1)
+        if not self.available:
+            self.description += b' / off'
 
 
 class PulseCard(DebugMixin):
@@ -701,9 +712,13 @@ class PulseCard(DebugMixin):
         self.driver = pa_card.driver
         self.owner_module = pa_card.owner_module
         self.n_profiles = pa_card.n_profiles
-        self.profiles = [PulseCardProfile(pa_card.profiles[n]) for n in range(self.n_profiles)]
-        self.active_profile = PulseCardProfile(pa_card.active_profile[0])
-        self.volume = type('volume', (object,), {'channels': 1, 'values': [0, 0]})
+        try:
+            self.profiles = [PulseCardProfile(pa_card.profiles2[n].contents) for n in range(self.n_profiles)]
+            self.active_profile = PulseCardProfile(pa_card.active_profile2[0])
+        except:  # fallback to legacy profile, for PA < 5.0 (March 2014)
+            self.profiles = [PulseCardProfile(pa_card.profiles[n]) for n in range(self.n_profiles)]
+            self.active_profile = PulseCardProfile(pa_card.active_profile[0])
+        self.volume = type('volume', (object, ), {'channels': 1, 'values': [0, 0]})
 
     def __str__(self):
         return "Card-ID: {}, Name: {}".format(self.index, self.name.decode())
@@ -1343,10 +1358,11 @@ class Screen():
         for i in line.split('\n'):
             parts = i.rsplit('|')
             head = ''.join(parts[:-1])
+            tail = int(parts[-1] or 0)
             try:
-                self.screen.addstr(index, shift, head, int(parts[-1]) | mod)
+                self.screen.addstr(index, shift, head, tail | mod)
             except:
-                self.screen.addstr(min(curses.LINES - 1, index), min(curses.COLS - 1, shift), head, int(parts[-1]) | mod)
+                self.screen.addstr(min(curses.LINES - 1, index), min(curses.COLS - 1, shift), head, tail | mod)
             shift += len(head)
 
     def change_mode(self, mode):
@@ -1400,7 +1416,7 @@ class Screen():
             "M  ", self.red if bar.muted else curses.A_DIM, name, curses.A_NORMAL)
         self.info += '{:>{}}%|{}'.format(pos, self.cols - len(name) - 6, curses.A_BOLD)
 
-    def check_resize(self):
+    def resize(self):
         if curses.is_term_resized(curses.LINES, curses.COLS):
             self.screen.erase()
             y, x = self.screen.getmaxyx()
@@ -1452,7 +1468,7 @@ class Screen():
         signal.signal(signal.SIGINT, lambda signal, frame: self.sigint())
         while True:
             try:
-                self.check_resize()
+                self.resize()
                 if not self.submenu_show:
                     try:
                         self.get_data()
@@ -1512,10 +1528,14 @@ class Screen():
                         if self.selected[0].pa.n_ports:
                             self.submenu_data.append('Set port')
                     elif type(self.selected[0].pa) is PulseCard:
-                        self.submenu_data = [p.description.decode() for p in self.selected[0].pa.profiles]
+                        self.submenu_data = []
                         active = self.selected[0].pa.active_profile.description.decode()
-                        if active in self.submenu_data:
-                            self.submenu_data[self.submenu_data.index(active)] = ' {}|{}'.format(active, self.green)
+                        for profile in self.selected[0].pa.profiles:
+                            description = profile.description.decode()
+                            if active == description:
+                                self.submenu_data.append(' {}|{}'.format(description, self.green))
+                            else:
+                                self.submenu_data.append(' {}|{}'.format(description, 0 if profile.available else self.muted_color))
                     else:
                         self.submenu_data = ['Move', 'Kill']
                     self.submenu_show = True
@@ -1524,8 +1544,7 @@ class Screen():
                     self.modes_data[5][2] = self.top_line_num
                     self.focus_line_num = self.top_line_num = 0
                     self.n_lines = len(self.submenu_data)
-                    self.submenu_width = min(self.cols - 2, max(30, len(max(self.submenu_data, key=len)) + 5))
-                    self.submenu_data = [s[:self.submenu_width - 4] for s in self.submenu_data]
+                    self.resize_submenu()
                 elif not self.change_mode_allowed:
                     self.submenu_show = False
                     self.change_mode_allowed = True
@@ -1872,12 +1891,16 @@ class Screen():
         if c in (ord('q'), self.ESC_KEY):
             self.helpwin_show = False
 
+    def resize_submenu(self):
+        key = lambda x: len(x.split('|')[0])
+        self.submenu_width = min(self.cols + 1, max( 30, len( max(self.submenu_data, key=key).split('|')[0]) + 3))
+        self.submenu.resize(curses.LINES, self.submenu_width + 1)
+
     def display_submenu(self):
-        self.submenu.erase()
         top = self.top_line_num
         bottom = self.top_line_num + self.lines + 2
-        self.submenu.resize(curses.LINES, self.submenu_width + 1)
-        self.submenu.vline(0, self.submenu_width, curses.ACS_VLINE, self.lines + 2)
+        self.submenu.erase()
+        self.submenu.vline(0, self.submenu_width, curses.ACS_VLINE, curses.LINES)
         for index, line in enumerate(self.submenu_data[top:bottom]):
             if index == self.focus_line_num:
                 focus_hl = curses.A_BOLD
@@ -1886,7 +1909,7 @@ class Screen():
                 focus_hl = curses.A_NORMAL
                 arrow = ' '
             if '|' in line:
-                self.display_line(index, ' ' + arrow + line, focus_hl)
+                self.display_line(index, ' {}|0\n'.format(arrow) + line, focus_hl)
             else:
                 self.submenu.addstr(index, 1, arrow + ' ' + line, focus_hl)
         self.submenu.refresh()
