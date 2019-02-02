@@ -106,6 +106,7 @@ class PA_PORT_INFO(Structure):
         ('name',        c_char_p),
         ('description', c_char_p),
         ('priority',    c_uint32),
+        ("available",   c_int),
     ]
 
 
@@ -683,6 +684,9 @@ class PulsePort(DebugMixin):
         self.name = pa_port.name
         self.description = pa_port.description
         self.priority = pa_port.priority
+        self.available = getattr(pa_port, "available", 0)
+        if self.available == 1:  # 1 off, 0 n/a, 2 on
+            self.description += b' / off'
 
 
 class PulseServer(DebugMixin):
@@ -1669,13 +1673,13 @@ class Screen():
                     PULSE.set_default_source(self.selected[0].pa.name)
             elif self.action == 'Set port':
                 self.submenu_data = []
-                for i in self.selected[0].pa.ports:
-                    s = i.description.decode().strip('|')
-                    if len(s) > 26:
-                        s = s[:23] + '..'
-                    self.submenu_data.append(s)
-                    if self.selected[0].pa.active_port.name == i.name:
-                        self.submenu_data[-1] = " {}|{}".format(self.submenu_data[-1], self.green)
+                active = self.selected[0].pa.active_port.description.decode()
+                for port in self.selected[0].pa.ports:
+                    description = port.description.decode()
+                    if active == description:
+                        self.submenu_data.append(' {}|{}'.format(description, self.green))
+                    else:
+                        self.submenu_data.append(' {}|{}'.format(description, 0 if port.available != 1 else self.muted_color))
                 self.focus_line_num = self.top_line_num = 0
                 self.n_lines = len(self.submenu_data)
                 return
