@@ -1630,9 +1630,9 @@ class Screen():
             self.top_line_num = self.modes_data[5][2]
 
         elif c in (curses.KEY_UP, ord('k'), curses.KEY_PPAGE):
-            self.scroll(self.UP)
+            self.scroll(self.UP, cycle=True)
         elif c in (curses.KEY_DOWN, ord('j'), curses.KEY_NPAGE):
-            self.scroll(self.DOWN)
+            self.scroll(self.DOWN, cycle=True)
         elif c == curses.KEY_HOME:
             self.scroll_first()
         elif c == curses.KEY_END:
@@ -1918,28 +1918,32 @@ class Screen():
                 self.submenu.addstr(index, 1, arrow + ' ' + line, focus_hl)
         self.submenu.refresh()
 
-    def scroll(self, n):
+    def scroll(self, n, cycle=False):
         next_line_num = self.focus_line_num + n
 
         if n == self.UP and self.focus_line_num == 0 and self.top_line_num != 0:
             self.top_line_num += self.UP
             return
-        elif n == self.DOWN and next_line_num == self.lines and\
-                (self.top_line_num + self.lines) != self.n_lines:
+        elif n == self.DOWN and next_line_num == self.lines and (self.top_line_num + self.lines) != self.n_lines:
             self.top_line_num += self.DOWN
             return
 
-        if n == self.UP and (self.top_line_num != 0 or self.focus_line_num != 0):
-            self.focus_line_num = next_line_num
-        elif n == self.DOWN and self.focus_line_num != self.lines and\
-                (self.top_line_num + self.focus_line_num + 1) != self.n_lines:
-            self.focus_line_num = next_line_num
+        if n == self.UP:
+            if self.top_line_num != 0 or self.focus_line_num != 0:
+                self.focus_line_num = next_line_num
+            elif cycle:
+                self.scroll_last()
+        elif n == self.DOWN and self.focus_line_num != self.lines:
+            if self.top_line_num + self.focus_line_num + 1 != self.n_lines:
+                self.focus_line_num = next_line_num
+            elif cycle:
+                self.scroll_first()
 
     def scroll_first(self):
-        for _ in range(len(self.data)): self.scroll(self.UP)
+        for _ in range(self.n_lines): self.scroll(self.UP)
 
     def scroll_last(self):
-        for _ in range(len(self.data)): self.scroll(self.DOWN)
+        for _ in range(self.n_lines): self.scroll(self.DOWN)
 
 
 def usage(): print(__doc__)
