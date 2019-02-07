@@ -50,9 +50,7 @@ pulsemixer --get-volume --change-volume +5 --get-volume
 65 65
 70 70
 ```
-**Note on id:** `--id` must be specified before the set/get/mute command, i.e. `pulsemixer --id 470 --get-volume`. If `--id` isn't specified of specified after the command, then that command will use default sink.
-
-It is not the most common cli behavior (and may be changed in the future), but it was done to avoid consecutive calls to pulsemixer, to chain commands with a single call. For example you could do this:
+And chain commands with a single call. For example you could do this:
 ```
 pulsemixer --id 470 --get-volume --id 2 --get-volume --change-volume +5 --get-volume
 90 90

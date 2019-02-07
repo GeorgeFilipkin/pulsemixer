@@ -1997,13 +1997,18 @@ def main():
     sources = PULSE.source_list()
     source_outputs = PULSE.source_output_list()
     server_info = PULSE.get_server_info()
-    index = [s.index for s in sinks if s.name == server_info.default_sink_name][0]
+
+    check_n = lambda x, err: x.strip('+-').isdigit() or sys.exit('ERR: {} must be a number'.format(err))
+    if '--id' in dopts:
+        index = [i for i in opts if '--id' in i][0][1]
+        index = check_n(index, err='ID') and int(index)
+    else:
+        index = [s.index for s in sinks if s.name == server_info.default_sink_name][0]
     streams = {}
     for i in source_outputs + sources + sink_inputs + sinks:
         streams[i.index] = i
     check_id = lambda x: x in streams or sys.exit('ERR: No such ID: ' + str(x))
     check_id(index)
-    check_n = lambda x, err: x.strip('+-').isdigit() or sys.exit('ERR: {} must be a number'.format(err))
     print_default = lambda x, y: print(x == y and ', Default' or '')
 
     for opt, arg in opts:
