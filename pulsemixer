@@ -468,6 +468,10 @@ pa_context_get_server_info = DLL.pa_context_get_server_info
 pa_context_get_server_info.restype = POINTER(PA_OPERATION)
 pa_context_get_server_info.argtypes = [POINTER(PA_CONTEXT), PA_SERVER_INFO_CB_T, c_void_p]
 
+pa_get_library_version = DLL.pa_get_library_version
+pa_get_library_version.restype = c_char_p
+PA_MAJOR = int(pa_get_library_version().decode().split('.')[0])
+
 # ^ bindings
 #########################################################################################
 # v lib
@@ -517,10 +521,10 @@ class PulseCard(DebugMixin):
         self.driver = pa_card.driver
         self.owner_module = pa_card.owner_module
         self.n_profiles = pa_card.n_profiles
-        try:
+        if PA_MAJOR >= 5:
             self.profiles = [PulseCardProfile(pa_card.profiles2[n].contents) for n in range(self.n_profiles)]
             self.active_profile = PulseCardProfile(pa_card.active_profile2[0])
-        except:  # fallback to legacy profile, for PA < 5.0 (March 2014)
+        else:  # fallback to legacy profile, for PA < 5.0 (March 2014)
             self.profiles = [PulseCardProfile(pa_card.profiles[n]) for n in range(self.n_profiles)]
             self.active_profile = PulseCardProfile(pa_card.active_profile[0])
         self.volume = type('volume', (object, ), {'channels': 1, 'values': [0, 0]})
