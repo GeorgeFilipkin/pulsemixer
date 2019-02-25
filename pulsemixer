@@ -24,13 +24,15 @@ import curses
 import functools
 import getopt
 import operator
+import os
 import re
 import signal
 import sys
+import threading
 import traceback
 from ctypes import *
-from os import environ, getenv
 from pprint import pprint
+from select import select
 from time import sleep
 
 #########################################################################################
@@ -41,11 +43,7 @@ try:
 except Exception as err:
     sys.exit(err)
 
-PA_VOLUME_NORM = 65536
-PA_CHANNELS_MAX = 32
-PA_USEC_T = c_uint64
-
-bar_style = getenv('PULSEMIXER_BAR_STYLE', '┌╶┐╴└┘▮- ──').ljust(11, '?')
+bar_style = os.getenv('PULSEMIXER_BAR_STYLE', '┌╶┐╴└┘▮- ──').ljust(11, '?')
 BAR_TOP_LEFT       = bar_style[0]
 BAR_LEFT_MONO      = bar_style[1]
 BAR_TOP_RIGHT      = bar_style[2]
@@ -58,8 +56,15 @@ ARROW              = bar_style[8]
 ARROW_FOCUSED      = bar_style[9]
 ARROW_LOCKED       = bar_style[10]
 
+PA_VOLUME_NORM = 65536
+PA_CHANNELS_MAX = 32
+PA_USEC_T = c_uint64
+PA_CONTEXT_READY = 4
+PA_CONTEXT_FAILED = 5
+PA_SUBSCRIPTION_MASK_ALL = 0x02ff
 
-class PA_MAINLOOP(Structure):
+
+class PA_THREADED_MAINLOOP(Structure):
     pass
 
 
@@ -254,82 +259,54 @@ class PA_SERVER_INFO(Structure):
         ('default_source_name', c_char_p),
     ]
 
-PA_STATE_CB_T = CFUNCTYPE(c_int, POINTER(PA_CONTEXT), c_void_p)
 
-PA_SIGNAL_CB_T = CFUNCTYPE(c_void_p,
-                           POINTER(PA_MAINLOOP_API),
-                           POINTER(c_int),
-                           c_int,
-                           c_void_p)
+PA_STATE_CB_T              = CFUNCTYPE(c_int, POINTER(PA_CONTEXT), c_void_p)
+PA_SIGNAL_CB_T             = CFUNCTYPE(c_void_p, POINTER(PA_MAINLOOP_API), POINTER(c_int), c_int, c_void_p)
+PA_CLIENT_INFO_CB_T        = CFUNCTYPE(c_void_p, POINTER(PA_CONTEXT), POINTER(PA_CLIENT_INFO), c_int, c_void_p)
+PA_SINK_INPUT_INFO_CB_T    = CFUNCTYPE(c_int, POINTER(PA_CONTEXT), POINTER(PA_SINK_INPUT_INFO), c_int, c_void_p)
+PA_SINK_INFO_CB_T          = CFUNCTYPE(c_int, POINTER(PA_CONTEXT), POINTER(PA_SINK_INFO), c_int, c_void_p)
+PA_SOURCE_OUTPUT_INFO_CB_T = CFUNCTYPE(c_int, POINTER(PA_CONTEXT), POINTER(PA_SOURCE_OUTPUT_INFO), c_int, c_void_p)
+PA_SOURCE_INFO_CB_T        = CFUNCTYPE(c_int, POINTER(PA_CONTEXT), POINTER(PA_SOURCE_INFO), c_int, c_void_p)
+PA_CONTEXT_SUCCESS_CB_T    = CFUNCTYPE(c_void_p, POINTER(PA_CONTEXT), c_int, c_void_p)
+PA_CARD_INFO_CB_T          = CFUNCTYPE(None, POINTER(PA_CONTEXT), POINTER(PA_CARD_INFO), c_int, c_void_p)
+PA_SERVER_INFO_CB_T        = CFUNCTYPE(None, POINTER(PA_CONTEXT), POINTER(PA_SERVER_INFO), c_void_p)
+PA_CONTEXT_SUBSCRIBE_CB_T  = CFUNCTYPE(c_void_p, POINTER(PA_CONTEXT), c_int, c_int, c_void_p)
 
-PA_CLIENT_INFO_CB_T = CFUNCTYPE(c_void_p,
-                                POINTER(PA_CONTEXT),
-                                POINTER(PA_CLIENT_INFO),
-                                c_int,
-                                c_void_p)
+pa_threaded_mainloop_new = DLL.pa_threaded_mainloop_new
+pa_threaded_mainloop_new.restype = POINTER(PA_THREADED_MAINLOOP)
+pa_threaded_mainloop_new.argtypes = []
 
-PA_SINK_INPUT_INFO_CB_T = CFUNCTYPE(c_int,
-                                    POINTER(PA_CONTEXT),
-                                    POINTER(PA_SINK_INPUT_INFO),
-                                    c_int,
-                                    c_void_p)
+pa_threaded_mainloop_free = DLL.pa_threaded_mainloop_free
+pa_threaded_mainloop_free.restype = c_void_p
+pa_threaded_mainloop_free.argtypes = [POINTER(PA_THREADED_MAINLOOP)]
 
-PA_SINK_INFO_CB_T = CFUNCTYPE(c_int,
-                              POINTER(PA_CONTEXT),
-                              POINTER(PA_SINK_INFO),
-                              c_int,
-                              c_void_p)
+pa_threaded_mainloop_start = DLL.pa_threaded_mainloop_start
+pa_threaded_mainloop_start.restype = c_int
+pa_threaded_mainloop_start.argtypes = [POINTER(PA_THREADED_MAINLOOP)]
 
-PA_SOURCE_OUTPUT_INFO_CB_T = CFUNCTYPE(c_int,
-                                       POINTER(PA_CONTEXT),
-                                       POINTER(PA_SOURCE_OUTPUT_INFO),
-                                       c_int,
-                                       c_void_p)
+pa_threaded_mainloop_stop = DLL.pa_threaded_mainloop_stop
+pa_threaded_mainloop_stop.restype = None
+pa_threaded_mainloop_stop.argtypes = [POINTER(PA_THREADED_MAINLOOP)]
 
-PA_SOURCE_INFO_CB_T = CFUNCTYPE(c_int,
-                                POINTER(PA_CONTEXT),
-                                POINTER(PA_SOURCE_INFO),
-                                c_int,
-                                c_void_p)
+pa_threaded_mainloop_lock = DLL.pa_threaded_mainloop_lock
+pa_threaded_mainloop_lock.restype = None
+pa_threaded_mainloop_lock.argtypes = [POINTER(PA_THREADED_MAINLOOP)]
 
-PA_CONTEXT_SUCCESS_CB_T = CFUNCTYPE(c_void_p,
-                                    POINTER(PA_CONTEXT),
-                                    c_int,
-                                    c_void_p)
+pa_threaded_mainloop_unlock = DLL.pa_threaded_mainloop_unlock
+pa_threaded_mainloop_unlock.restype = None
+pa_threaded_mainloop_unlock.argtypes = [POINTER(PA_THREADED_MAINLOOP)]
 
-PA_CARD_INFO_CB_T = CFUNCTYPE(None,
-                              POINTER(PA_CONTEXT),
-                              POINTER(PA_CARD_INFO),
-                              c_int,
-                              c_void_p)
+pa_threaded_mainloop_wait = DLL.pa_threaded_mainloop_wait
+pa_threaded_mainloop_wait.restype = None
+pa_threaded_mainloop_wait.argtypes = [POINTER(PA_THREADED_MAINLOOP)]
 
-PA_SERVER_INFO_CB_T = CFUNCTYPE(None,
-                                POINTER(PA_CONTEXT),
-                                POINTER(PA_SERVER_INFO),
-                                c_void_p)
-PA_CONTEXT_READY = 4
-PA_CONTEXT_FAILED = 5
-PA_CONTEXT_TERMINATED = 6
+pa_threaded_mainloop_signal = DLL.pa_threaded_mainloop_signal
+pa_threaded_mainloop_signal.restype = None
+pa_threaded_mainloop_signal.argtypes = [POINTER(PA_THREADED_MAINLOOP), c_int]
 
-pa_mainloop_new = DLL.pa_mainloop_new
-pa_mainloop_new.restype = POINTER(PA_MAINLOOP)
-pa_mainloop_new.argtypes = []
-
-pa_mainloop_get_api = DLL.pa_mainloop_get_api
-pa_mainloop_get_api.restype = POINTER(PA_MAINLOOP_API)
-pa_mainloop_get_api.argtypes = [POINTER(PA_MAINLOOP)]
-
-pa_mainloop_run = DLL.pa_mainloop_run
-pa_mainloop_run.restype = c_int
-pa_mainloop_run.argtypes = [POINTER(PA_MAINLOOP), POINTER(c_int)]
-
-pa_mainloop_iterate = DLL.pa_mainloop_iterate
-pa_mainloop_iterate.restype = c_int
-pa_mainloop_iterate.argtypes = [POINTER(PA_MAINLOOP), c_int, POINTER(c_int)]
-
-pa_mainloop_free = DLL.pa_mainloop_free
-pa_mainloop_free.restype = c_int
-pa_mainloop_free.argtypes = [POINTER(PA_MAINLOOP)]
+pa_threaded_mainloop_get_api = DLL.pa_threaded_mainloop_get_api
+pa_threaded_mainloop_get_api.restype = POINTER(PA_MAINLOOP_API)
+pa_threaded_mainloop_get_api.argtypes = [POINTER(PA_THREADED_MAINLOOP)]
 
 pa_signal_init = DLL.pa_signal_init
 pa_signal_init.restype = c_int
@@ -337,7 +314,7 @@ pa_signal_init.argtypes = [POINTER(PA_MAINLOOP_API)]
 
 pa_signal_new = DLL.pa_signal_new
 pa_signal_new.restype = None
-pa_signal_new.argtypes = [c_int, PA_SIGNAL_CB_T, POINTER(c_int)]
+pa_signal_new.argtypes = [c_int, PA_SIGNAL_CB_T, POINTER(c_void_p)]
 
 pa_context_errno = DLL.pa_context_errno
 pa_context_errno.restype = c_int
@@ -353,20 +330,11 @@ pa_context_unref.argtypes = [POINTER(PA_CONTEXT)]
 
 pa_context_set_state_callback = DLL.pa_context_set_state_callback
 pa_context_set_state_callback.restype = None
-pa_context_set_state_callback.argtypes = [
-    POINTER(PA_CONTEXT),
-    PA_STATE_CB_T,
-    c_void_p
-]
+pa_context_set_state_callback.argtypes = [POINTER(PA_CONTEXT), PA_STATE_CB_T, c_void_p]
 
 pa_context_connect = DLL.pa_context_connect
 pa_context_connect.restype = c_int
-pa_context_connect.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_char_p,
-    c_int,
-    POINTER(c_int)
-]
+pa_context_connect.argtypes = [POINTER(PA_CONTEXT), c_char_p, c_int, POINTER(c_int)]
 
 pa_context_get_state = DLL.pa_context_get_state
 pa_context_get_state.restype = c_int
@@ -376,296 +344,129 @@ pa_context_disconnect = DLL.pa_context_disconnect
 pa_context_disconnect.restype = c_int
 pa_context_disconnect.argtypes = [POINTER(PA_CONTEXT)]
 
+pa_operation_unref = DLL.pa_operation_unref
+pa_operation_unref.restype = None
+pa_operation_unref.argtypes = [POINTER(PA_OPERATION)]
+
+pa_context_subscribe = DLL.pa_context_subscribe
+pa_context_subscribe.restype = POINTER(PA_OPERATION)
+pa_context_subscribe.argtypes = [POINTER(PA_CONTEXT), c_int, PA_CONTEXT_SUCCESS_CB_T, c_void_p]
+
+pa_context_set_subscribe_callback = DLL.pa_context_set_subscribe_callback
+pa_context_set_subscribe_callback.restype = None
+pa_context_set_subscribe_callback.args = [POINTER(PA_CONTEXT), PA_CONTEXT_SUBSCRIBE_CB_T, c_void_p]
+
 pa_proplist_gets = DLL.pa_proplist_gets
 pa_proplist_gets.restype = c_char_p
 pa_proplist_gets.argtypes = [POINTER(PA_PROPLIST), c_char_p]
 
 pa_context_get_sink_input_info_list = DLL.pa_context_get_sink_input_info_list
-pa_context_get_sink_input_info_list.restype = POINTER(c_int)
-pa_context_get_sink_input_info_list.argtypes = [
-    POINTER(PA_CONTEXT),
-    PA_SINK_INPUT_INFO_CB_T,
-    c_void_p
-]
+pa_context_get_sink_input_info_list.restype = POINTER(PA_OPERATION)
+pa_context_get_sink_input_info_list.argtypes = [POINTER(PA_CONTEXT), PA_SINK_INPUT_INFO_CB_T, c_void_p]
 
 pa_context_get_sink_info_list = DLL.pa_context_get_sink_info_list
-pa_context_get_sink_info_list.restype = POINTER(c_int)
-pa_context_get_sink_info_list.argtypes = [
-    POINTER(PA_CONTEXT),
-    PA_SINK_INFO_CB_T,
-    c_void_p
-]
+pa_context_get_sink_info_list.restype = POINTER(PA_OPERATION)
+pa_context_get_sink_info_list.argtypes = [POINTER(PA_CONTEXT), PA_SINK_INFO_CB_T, c_void_p]
 
 pa_context_set_sink_mute_by_index = DLL.pa_context_set_sink_mute_by_index
-pa_context_set_sink_mute_by_index.restype = POINTER(c_int)
-pa_context_set_sink_mute_by_index.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    c_int,
-    PA_CONTEXT_SUCCESS_CB_T,
-    c_void_p
-]
+pa_context_set_sink_mute_by_index.restype = POINTER(PA_OPERATION)
+pa_context_set_sink_mute_by_index.argtypes = [POINTER(PA_CONTEXT), c_uint32, c_int, PA_CONTEXT_SUCCESS_CB_T, c_void_p]
 
 pa_context_suspend_sink_by_index = DLL.pa_context_suspend_sink_by_index
-pa_context_suspend_sink_by_index.restype = POINTER(c_int)
-pa_context_suspend_sink_by_index.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    c_int,
-    PA_CONTEXT_SUCCESS_CB_T,
-    c_void_p
-]
+pa_context_suspend_sink_by_index.restype = POINTER(PA_OPERATION)
+pa_context_suspend_sink_by_index.argtypes = [POINTER(PA_CONTEXT), c_uint32, c_int, PA_CONTEXT_SUCCESS_CB_T, c_void_p]
 
 pa_context_set_sink_port_by_index = DLL.pa_context_set_sink_port_by_index
-pa_context_set_sink_port_by_index.restype = POINTER(c_int)
-pa_context_set_sink_port_by_index.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    c_char_p,
-    PA_CONTEXT_SUCCESS_CB_T,
-    c_void_p
-]
+pa_context_set_sink_port_by_index.restype = POINTER(PA_OPERATION)
+pa_context_set_sink_port_by_index.argtypes = [POINTER(PA_CONTEXT), c_uint32, c_char_p, PA_CONTEXT_SUCCESS_CB_T, c_void_p]
 
 pa_context_set_sink_input_mute = DLL.pa_context_set_sink_input_mute
-pa_context_set_sink_input_mute.restype = POINTER(c_int)
-pa_context_set_sink_input_mute.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    c_int,
-    PA_CONTEXT_SUCCESS_CB_T,
-    c_void_p
-]
+pa_context_set_sink_input_mute.restype = POINTER(PA_OPERATION)
+pa_context_set_sink_input_mute.argtypes = [POINTER(PA_CONTEXT), c_uint32, c_int, PA_CONTEXT_SUCCESS_CB_T, c_void_p]
 
 pa_context_set_sink_volume_by_index = DLL.pa_context_set_sink_volume_by_index
-pa_context_set_sink_volume_by_index.restype = POINTER(c_int)
-pa_context_set_sink_volume_by_index.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    POINTER(PA_CVOLUME),
-    PA_CONTEXT_SUCCESS_CB_T,
-    c_void_p
-]
+pa_context_set_sink_volume_by_index.restype = POINTER(PA_OPERATION)
+pa_context_set_sink_volume_by_index.argtypes = [POINTER(PA_CONTEXT), c_uint32, POINTER(PA_CVOLUME), PA_CONTEXT_SUCCESS_CB_T, c_void_p]
 
 pa_context_set_sink_input_volume = DLL.pa_context_set_sink_input_volume
-pa_context_set_sink_input_volume.restype = POINTER(c_int)
-pa_context_set_sink_input_volume.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    POINTER(PA_CVOLUME),
-    PA_CONTEXT_SUCCESS_CB_T,
-    c_void_p
-]
+pa_context_set_sink_input_volume.restype = POINTER(PA_OPERATION)
+pa_context_set_sink_input_volume.argtypes = [POINTER(PA_CONTEXT), c_uint32, POINTER(PA_CVOLUME), PA_CONTEXT_SUCCESS_CB_T, c_void_p]
 
 pa_context_move_sink_input_by_index = DLL.pa_context_move_sink_input_by_index
-pa_context_move_sink_input_by_index.restype = POINTER(c_int)
-pa_context_move_sink_input_by_index.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    c_uint32,
-    PA_CONTEXT_SUCCESS_CB_T,
-    c_void_p
-]
+pa_context_move_sink_input_by_index.restype = POINTER(PA_OPERATION)
+pa_context_move_sink_input_by_index.argtypes = [POINTER(PA_CONTEXT), c_uint32, c_uint32, PA_CONTEXT_SUCCESS_CB_T, c_void_p]
 
 pa_context_set_default_sink = DLL.pa_context_set_default_sink
 pa_context_set_default_sink.restype = POINTER(PA_OPERATION)
-pa_context_set_default_sink.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_char_p,
-    PA_CONTEXT_SUCCESS_CB_T,
-    c_void_p
-]
+pa_context_set_default_sink.argtypes = [POINTER(PA_CONTEXT), c_char_p, PA_CONTEXT_SUCCESS_CB_T, c_void_p]
 
 pa_context_kill_sink_input = DLL.pa_context_kill_sink_input
 pa_context_kill_sink_input.restype = POINTER(PA_OPERATION)
-pa_context_kill_sink_input.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    PA_CONTEXT_SUCCESS_CB_T,
-    c_void_p
-]
+pa_context_kill_sink_input.argtypes = [POINTER(PA_CONTEXT), c_uint32, PA_CONTEXT_SUCCESS_CB_T, c_void_p]
 
 pa_context_kill_client = DLL.pa_context_kill_client
 pa_context_kill_client.restype = POINTER(PA_OPERATION)
-pa_context_kill_client.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    PA_CONTEXT_SUCCESS_CB_T,
-    c_void_p
-]
-
-pa_context_get_source_output_info = DLL.pa_context_get_source_output_info
-pa_context_get_source_output_info.restype = POINTER(c_int)
-pa_context_get_source_output_info.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    PA_SOURCE_OUTPUT_INFO_CB_T,
-    c_void_p
-]
+pa_context_kill_client.argtypes = [POINTER(PA_CONTEXT), c_uint32, PA_CONTEXT_SUCCESS_CB_T, c_void_p]
 
 pa_context_get_source_output_info_list = DLL.pa_context_get_source_output_info_list
-pa_context_get_source_output_info_list.restype = POINTER(c_int)
-pa_context_get_source_output_info_list.argtypes = [
-    POINTER(PA_CONTEXT),
-    PA_SOURCE_OUTPUT_INFO_CB_T,
-    c_void_p
-]
+pa_context_get_source_output_info_list.restype = POINTER(PA_OPERATION)
+pa_context_get_source_output_info_list.argtypes = [POINTER(PA_CONTEXT), PA_SOURCE_OUTPUT_INFO_CB_T, c_void_p]
 
 pa_context_move_source_output_by_index = DLL.pa_context_move_source_output_by_index
-pa_context_move_source_output_by_index.restype = POINTER(c_int)
-pa_context_move_source_output_by_index.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    c_uint32,
-    PA_CONTEXT_SUCCESS_CB_T,
-    c_void_p
-]
+pa_context_move_source_output_by_index.restype = POINTER(PA_OPERATION)
+pa_context_move_source_output_by_index.argtypes = [POINTER(PA_CONTEXT), c_uint32, c_uint32, PA_CONTEXT_SUCCESS_CB_T, c_void_p]
 
 pa_context_set_source_output_volume = DLL.pa_context_set_source_output_volume
-pa_context_set_source_output_volume.restype = POINTER(c_int)
-pa_context_set_source_output_volume.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    POINTER(PA_CVOLUME),
-    PA_CONTEXT_SUCCESS_CB_T,
-    c_void_p
-]
+pa_context_set_source_output_volume.restype = POINTER(PA_OPERATION)
+pa_context_set_source_output_volume.argtypes = [POINTER(PA_CONTEXT), c_uint32, POINTER(PA_CVOLUME), PA_CONTEXT_SUCCESS_CB_T, c_void_p]
 
 pa_context_set_source_output_mute = DLL.pa_context_set_source_output_mute
-pa_context_set_source_output_mute.restype = POINTER(c_int)
-pa_context_set_source_output_mute.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    c_int,
-    PA_CONTEXT_SUCCESS_CB_T,
-    c_void_p
-]
-
-pa_context_get_source_info_by_index = DLL.pa_context_get_source_info_by_index
-pa_context_get_source_info_by_index.restype = POINTER(c_int)
-pa_context_get_source_info_by_index.argtypes = [
-    POINTER(PA_CONTEXT),
-    PA_SOURCE_INFO_CB_T,
-    c_void_p
-]
+pa_context_set_source_output_mute.restype = POINTER(PA_OPERATION)
+pa_context_set_source_output_mute.argtypes = [POINTER(PA_CONTEXT), c_uint32, c_int, PA_CONTEXT_SUCCESS_CB_T, c_void_p]
 
 pa_context_get_source_info_list = DLL.pa_context_get_source_info_list
-pa_context_get_source_info_list.restype = POINTER(c_int)
-pa_context_get_source_info_list.argtypes = [
-    POINTER(PA_CONTEXT),
-    PA_SOURCE_INFO_CB_T,
-    c_void_p
-]
+pa_context_get_source_info_list.restype = POINTER(PA_OPERATION)
+pa_context_get_source_info_list.argtypes = [POINTER(PA_CONTEXT), PA_SOURCE_INFO_CB_T, c_void_p]
 
 pa_context_set_source_volume_by_index = DLL.pa_context_set_source_volume_by_index
-pa_context_set_source_volume_by_index.restype = POINTER(c_int)
-pa_context_set_source_volume_by_index.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    POINTER(PA_CVOLUME),
-    PA_CONTEXT_SUCCESS_CB_T,
-    c_void_p
-]
-
-pa_context_set_source_volume_by_index = DLL.pa_context_set_source_volume_by_index
-pa_context_set_source_volume_by_index.restype = POINTER(c_int)
-pa_context_set_source_volume_by_index.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    POINTER(PA_CVOLUME),
-    PA_CONTEXT_SUCCESS_CB_T,
-    c_void_p
-]
+pa_context_set_source_volume_by_index.restype = POINTER(PA_OPERATION)
+pa_context_set_source_volume_by_index.argtypes = [POINTER(PA_CONTEXT), c_uint32, POINTER(PA_CVOLUME), PA_CONTEXT_SUCCESS_CB_T, c_void_p]
 
 pa_context_set_source_mute_by_index = DLL.pa_context_set_source_mute_by_index
-pa_context_set_source_mute_by_index.restype = POINTER(c_int)
-pa_context_set_source_mute_by_index.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    c_int,
-    PA_CONTEXT_SUCCESS_CB_T,
-    c_void_p
-]
+pa_context_set_source_mute_by_index.restype = POINTER(PA_OPERATION)
+pa_context_set_source_mute_by_index.argtypes = [POINTER(PA_CONTEXT), c_uint32, c_int, PA_CONTEXT_SUCCESS_CB_T, c_void_p]
 
 pa_context_suspend_source_by_index = DLL.pa_context_suspend_source_by_index
-pa_context_suspend_source_by_index.restype = POINTER(c_int)
-pa_context_suspend_source_by_index.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    c_int,
-    PA_CONTEXT_SUCCESS_CB_T,
-    c_void_p
-]
+pa_context_suspend_source_by_index.restype = POINTER(PA_OPERATION)
+pa_context_suspend_source_by_index.argtypes = [POINTER(PA_CONTEXT), c_uint32, c_int, PA_CONTEXT_SUCCESS_CB_T, c_void_p]
 
 pa_context_set_source_port_by_index = DLL.pa_context_set_source_port_by_index
-pa_context_set_source_port_by_index.restype = POINTER(c_int)
-pa_context_set_source_port_by_index.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    c_char_p,
-    PA_CONTEXT_SUCCESS_CB_T,
-    c_void_p
-]
+pa_context_set_source_port_by_index.restype = POINTER(PA_OPERATION)
+pa_context_set_source_port_by_index.argtypes = [POINTER(PA_CONTEXT), c_uint32, c_char_p, PA_CONTEXT_SUCCESS_CB_T, c_void_p]
 
 pa_context_set_default_source = DLL.pa_context_set_default_source
 pa_context_set_default_source.restype = POINTER(PA_OPERATION)
-pa_context_set_default_source.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_char_p,
-    PA_CONTEXT_SUCCESS_CB_T,
-    c_void_p
-]
+pa_context_set_default_source.argtypes = [POINTER(PA_CONTEXT), c_char_p, PA_CONTEXT_SUCCESS_CB_T, c_void_p]
 
 pa_context_kill_source_output = DLL.pa_context_kill_source_output
 pa_context_kill_source_output.restype = POINTER(PA_OPERATION)
-pa_context_kill_source_output.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    PA_CONTEXT_SUCCESS_CB_T,
-    c_void_p
-]
+pa_context_kill_source_output.argtypes = [POINTER(PA_CONTEXT), c_uint32, PA_CONTEXT_SUCCESS_CB_T, c_void_p]
 
 pa_context_get_client_info_list = DLL.pa_context_get_client_info_list
-pa_context_get_client_info_list.restype = POINTER(c_int)
-pa_context_get_client_info_list.argtypes = [
-    POINTER(PA_CONTEXT),
-    PA_CLIENT_INFO_CB_T,
-    c_void_p
-]
-
-pa_context_get_card_info_by_index = DLL.pa_context_get_card_info_by_index
-pa_context_get_card_info_by_index.restype = POINTER(PA_OPERATION)
-pa_context_get_card_info_by_index.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    PA_CARD_INFO_CB_T,
-    c_void_p
-]
+pa_context_get_client_info_list.restype = POINTER(PA_OPERATION)
+pa_context_get_client_info_list.argtypes = [POINTER(PA_CONTEXT), PA_CLIENT_INFO_CB_T, c_void_p]
 
 pa_context_get_card_info_list = DLL.pa_context_get_card_info_list
 pa_context_get_card_info_list.restype = POINTER(PA_OPERATION)
-pa_context_get_card_info_list.argtypes = [
-    POINTER(PA_CONTEXT),
-    PA_CARD_INFO_CB_T,
-    c_void_p
-]
+pa_context_get_card_info_list.argtypes = [POINTER(PA_CONTEXT), PA_CARD_INFO_CB_T, c_void_p]
 
 pa_context_set_card_profile_by_index = DLL.pa_context_set_card_profile_by_index
-pa_context_set_card_profile_by_index.restype = POINTER(c_int)
-pa_context_set_card_profile_by_index.argtypes = [
-    POINTER(PA_CONTEXT),
-    c_uint32,
-    c_char_p,
-    PA_CONTEXT_SUCCESS_CB_T,
-    c_void_p
-]
+pa_context_set_card_profile_by_index.restype = POINTER(PA_OPERATION)
+pa_context_set_card_profile_by_index.argtypes = [POINTER(PA_CONTEXT), c_uint32, c_char_p, PA_CONTEXT_SUCCESS_CB_T, c_void_p]
 
 pa_context_get_server_info = DLL.pa_context_get_server_info
 pa_context_get_server_info.restype = POINTER(PA_OPERATION)
-pa_context_get_server_info.argtypes = [
-    POINTER(PA_CONTEXT),
-    PA_SERVER_INFO_CB_T,
-    c_void_p
-]
+pa_context_get_server_info.argtypes = [POINTER(PA_CONTEXT), PA_SERVER_INFO_CB_T, c_void_p]
 
 # ^ bindings
 #########################################################################################
@@ -742,54 +543,52 @@ class PulseClient(DebugMixin):
 
 class Pulse(DebugMixin):
 
-    def __init__(self, client_name='libpulse', server_name=None):
-        self.ret = None
+    def __init__(self, client_name='libpulse', server_name=None, reconnect=False):
         self.error = None
-        self.operation = None
-        self.connected = True
-        self.action_done = False
         self.data = []
+        self.operation = None
+        self.connected = False
         self.client_name = client_name.encode()
         self.server_name = server_name
 
         self.pa_signal_cb = PA_SIGNAL_CB_T(self.signal_cb)
         self.pa_state_cb = PA_STATE_CB_T(self.state_cb)
+        self.pa_subscribe_cb = self.pa_dc_cb = lambda: None
+        self.pa_cbs = {'sink_input_info':    PA_SINK_INPUT_INFO_CB_T(self.sink_input_cb),
+                       'source_output_info': PA_SOURCE_OUTPUT_INFO_CB_T(self.source_output_cb),
+                       'sink_info':          PA_SINK_INFO_CB_T(self.sink_cb),
+                       'source_info':        PA_SOURCE_INFO_CB_T(self.source_cb),
+                       'server_info':        PA_SERVER_INFO_CB_T(self.server_cb),
+                       'card_info':          PA_CARD_INFO_CB_T(self.card_cb),
+                       'client_info':        PA_CLIENT_INFO_CB_T(self.client_cb),
+                       'success':            PA_CONTEXT_SUCCESS_CB_T(self.context_success)}
 
-        self.mainloop = pa_mainloop_new()
-        self.mainloop_api = pa_mainloop_get_api(self.mainloop)
-
-        assert pa_signal_init(self.mainloop_api) == 0, "pa_signal_init failed"
-
-        pa_signal_new(2, self.pa_signal_cb, None)
-        pa_signal_new(15, self.pa_signal_cb, None)
+        self.mainloop = pa_threaded_mainloop_new()
+        self.mainloop_api = pa_threaded_mainloop_get_api(self.mainloop)
 
         self.context = pa_context_new(self.mainloop_api, self.client_name)
         pa_context_set_state_callback(self.context, self.pa_state_cb, None)
 
+        if not reconnect: assert pa_signal_init(self.mainloop_api) == 0, "pa_signal_init failed"
+        pa_signal_new(2, self.pa_signal_cb, None)
+        pa_signal_new(15, self.pa_signal_cb, None)
         if pa_context_connect(self.context, self.server_name, 0, None) < 0:
             self.disconnect()
-            sys.exit("Failed to connect to pulseaudio daemon: Connection refused")
-        self.iterate()
+            if not reconnect: sys.exit("Failed to connect to pulseaudio: Connection refused")
+            else: return
+
+        pa_threaded_mainloop_lock(self.mainloop)
+        pa_threaded_mainloop_start(self.mainloop)
+        pa_threaded_mainloop_wait(self.mainloop) or pa_threaded_mainloop_unlock(self.mainloop)
+        self.connected = True
+
+    def wait_and_unlock(self):
+        pa_threaded_mainloop_wait(self.mainloop)
+        pa_threaded_mainloop_unlock(self.mainloop)
+        pa_operation_unref(self.operation)
 
     def reconnect(self):
-        self.connected = False
-        while not self.connected:
-            self.error = None
-            self.disconnect()
-
-            self.mainloop = pa_mainloop_new()
-            self.mainloop_api = pa_mainloop_get_api(self.mainloop)
-
-            self.context = pa_context_new(self.mainloop_api, self.client_name)
-            pa_context_set_state_callback(self.context, self.pa_state_cb, None)
-
-            try:
-                if pa_context_connect(self.context, self.server_name, 0, None) >= 0:
-                    self.iterate()
-                    self.connected = True
-            except:
-                pass
-            sleep(0.5)
+        self.__init__(self.client_name.decode(), self.server_name, reconnect=True)
 
     def unmute_stream(self, obj):
         if type(obj) is PulseSinkInfo:
@@ -846,230 +645,194 @@ class Pulse(DebugMixin):
     def signal_cb(self, api, e, sig, userdata):
         if sig in (2, 15):
             self.disconnect()
-        return 0
 
     def state_cb(self, c, b):
         state = pa_context_get_state(c)
         if state == PA_CONTEXT_READY:
-            self.complete_action()
-        elif state in (PA_CONTEXT_FAILED, PA_CONTEXT_TERMINATED):
+            pa_threaded_mainloop_signal(self.mainloop, 0)
+        elif state == PA_CONTEXT_FAILED:
+            self.connected = False
             self.error = RuntimeError("Failed to complete action: {}, {}".format(state, pa_context_errno(c)))
-            self.complete_action()
+            self.pa_dc_cb()
         return 0
 
-    def _action_cb(func):
-        def wrapper(self, c, info, eof, userdata):
+    def _eof_cb(func):
+        def wrapper(self, c, info, eof, *args):
             if eof:
-                self.complete_action()
+                pa_threaded_mainloop_signal(self.mainloop, 0)
                 return 0
-            func(self, c, info, eof, userdata)
+            func(self, c, info, eof, *args)
             return 0
         return wrapper
 
-    @_action_cb
+    def _action_sync(func):
+        def wrapper(self, *args):
+            if self.error: raise self.error
+            pa_threaded_mainloop_lock(self.mainloop)
+            func(self, *args)
+            self.wait_and_unlock()
+            data, self.data = self.data, []
+            return data or []
+        return wrapper
+
+    @_eof_cb
     def card_cb(self, c, card_info, eof, userdata):
         self.data.append(PulseCard(card_info[0]))
 
-    @_action_cb
+    @_eof_cb
     def client_cb(self, c, client_info, eof, userdata):
         self.data.append(PulseClient(client_info[0]))
 
-    @_action_cb
+    @_eof_cb
     def sink_input_cb(self, c, sink_input_info, eof, userdata):
         self.data.append(PulseSinkInputInfo(sink_input_info[0]))
 
-    @_action_cb
+    @_eof_cb
     def sink_cb(self, c, sink_info, eof, userdata):
         self.data.append(PulseSinkInfo(sink_info[0]))
 
-    @_action_cb
+    @_eof_cb
     def source_output_cb(self, c, source_output_info, eof, userdata):
         self.data.append(PulseSourceOutputInfo(source_output_info[0]))
 
-    @_action_cb
+    @_eof_cb
     def source_cb(self, c, source_info, eof, userdata):
         self.data.append(PulseSourceInfo(source_info[0]))
 
-    def server_cb(self, c, server_info, eof):
-        self.data.append(PulseServer(server_info[0]))
-        self.complete_action()
+    def server_cb(self, c, server_info, userdata):
+        self.data = PulseServer(server_info[0])
+        pa_threaded_mainloop_signal(self.mainloop, 0)
 
     def context_success(self, *_):
-        self.complete_action()
-        return 0
-
-    def complete_action(self):
-        self.action_done = True
-
-    def start_action(self):
-        self.action_done = False
+        pa_threaded_mainloop_signal(self.mainloop, 0)
 
     def disconnect(self):
+        self.connected = False
         pa_context_disconnect(self.context)
         pa_context_unref(self.context)
-        pa_mainloop_free(self.mainloop)
+        pa_threaded_mainloop_stop(self.mainloop)
+        pa_threaded_mainloop_free(self.mainloop)
+
+    def subscribe(self, cb):
+        self.pa_subscribe_cb, self.pa_dc_cb = PA_CONTEXT_SUBSCRIBE_CB_T(cb), cb
+        pa_context_set_subscribe_callback(self.context, self.pa_subscribe_cb, None)
+        pa_threaded_mainloop_lock(self.mainloop)
+        self.operation = pa_context_subscribe(self.context, PA_SUBSCRIPTION_MASK_ALL, self.pa_cbs['success'], None)
+        self.wait_and_unlock()
 
     def sink_input_list(self):
-        cb = PA_SINK_INPUT_INFO_CB_T(self.sink_input_cb)
-        self.operation = pa_context_get_sink_input_info_list(self.context, cb, None)
-        self.iterate()
+        pa_threaded_mainloop_lock(self.mainloop)
+        self.operation = pa_context_get_sink_input_info_list(self.context, self.pa_cbs['sink_input_info'], None)
+        self.wait_and_unlock()
         data, self.data = self.fill_clients(), []
-        return data or []
-
-    def sink_list(self):
-        cb = PA_SINK_INFO_CB_T(self.sink_cb)
-        self.operation = pa_context_get_sink_info_list(self.context, cb, None)
-        self.iterate()
-        data, self.data = self.data, []
         return data or []
 
     def source_output_list(self):
-        cb = PA_SOURCE_OUTPUT_INFO_CB_T(self.source_output_cb)
-        self.operation = pa_context_get_source_output_info_list(self.context, cb, None)
-        self.iterate()
+        pa_threaded_mainloop_lock(self.mainloop)
+        self.operation = pa_context_get_source_output_info_list(self.context, self.pa_cbs['source_output_info'], None)
+        self.wait_and_unlock()
         data, self.data = self.fill_clients(), []
         return data or []
 
+    @_action_sync
+    def sink_list(self):
+        self.operation = pa_context_get_sink_info_list(self.context, self.pa_cbs['sink_info'], None)
+
+    @_action_sync
     def source_list(self):
-        cb = PA_SOURCE_INFO_CB_T(self.source_cb)
-        self.operation = pa_context_get_source_info_list(self.context, cb, None)
-        self.iterate()
-        data, self.data = self.data, []
-        return data or []
+        self.operation = pa_context_get_source_info_list(self.context, self.pa_cbs['source_info'], None)
 
+    @_action_sync
     def get_server_info(self):
-        cb = PA_SERVER_INFO_CB_T(self.server_cb)
-        self.operation = pa_context_get_server_info(self.context, cb, None)
-        self.iterate()
-        data, self.data = self.data, []
-        return data[0] or None
+        self.operation = pa_context_get_server_info(self.context, self.pa_cbs['server_info'], None)
 
+    @_action_sync
     def card_list(self):
-        cb = PA_CARD_INFO_CB_T(self.card_cb)
-        self.operation = pa_context_get_card_info_list(self.context, cb, None)
-        self.iterate()
-        data, self.data = self.data, []
-        return data or []
+        self.operation = pa_context_get_card_info_list(self.context, self.pa_cbs['card_info'], None)
 
+    @_action_sync
     def client_list(self):
-        cb = PA_CLIENT_INFO_CB_T(self.client_cb)
-        self.operation = pa_context_get_client_info_list(self.context, cb, None)
-        self.iterate()
-        data, self.data = self.data, []
-        return data or []
+        self.operation = pa_context_get_client_info_list(self.context, self.pa_cbs['client_info'], None)
 
+    @_action_sync
     def sink_input_mute(self, index, mute):
-        context = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
-        self.operation = pa_context_set_sink_input_mute(self.context, index, mute, context, None)
-        self.iterate()
+        self.operation = pa_context_set_sink_input_mute(self.context, index, mute, self.pa_cbs['success'], None)
 
+    @_action_sync
     def sink_input_move(self, index, s_index):
-        context = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
-        self.operation = pa_context_move_sink_input_by_index(self.context, index, s_index, context, None)
-        self.iterate()
+        self.operation = pa_context_move_sink_input_by_index(self.context, index, s_index, self.pa_cbs['success'], None)
 
+    @_action_sync
     def sink_mute(self, index, mute):
-        context = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
-        self.operation = pa_context_set_sink_mute_by_index(self.context, index, mute, context, None)
-        self.iterate()
+        self.operation = pa_context_set_sink_mute_by_index(self.context, index, mute, self.pa_cbs['success'], None)
 
+    @_action_sync
     def set_sink_input_volume(self, index, vol):
-        context = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
-        self.operation = pa_context_set_sink_input_volume(self.context, index, vol.to_c(), context, None)
-        self.iterate()
+        self.operation = pa_context_set_sink_input_volume(self.context, index, vol.to_c(), self.pa_cbs['success'], None)
 
+    @_action_sync
     def set_sink_volume(self, index, vol):
-        context = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
-        self.operation = pa_context_set_sink_volume_by_index(self.context, index, vol.to_c(), context, None)
-        self.iterate()
+        self.operation = pa_context_set_sink_volume_by_index(self.context, index, vol.to_c(), self.pa_cbs['success'], None)
 
+    @_action_sync
     def sink_suspend(self, index, suspend):
-        context = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
-        self.operation = pa_context_suspend_sink_by_index(self.context, index, suspend, context, None)
-        self.iterate()
+        self.operation = pa_context_suspend_sink_by_index(self.context, index, suspend, self.pa_cbs['success'], None)
 
+    @_action_sync
     def set_default_sink(self, name):
-        context = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
-        self.operation = pa_context_set_default_sink(self.context, name, context, None)
-        self.iterate()
+        self.operation = pa_context_set_default_sink(self.context, name, self.pa_cbs['success'], None)
 
+    @_action_sync
     def kill_sink(self, index):
-        context = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
-        self.operation = pa_context_kill_sink_input(self.context, index, context, None)
-        self.iterate()
+        self.operation = pa_context_kill_sink_input(self.context, index, self.pa_cbs['success'], None)
 
+    @_action_sync
     def kill_client(self, index):
-        context = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
-        self.operation = pa_context_kill_client(self.context, index, context, None)
-        self.iterate()
+        self.operation = pa_context_kill_client(self.context, index, self.pa_cbs['success'], None)
 
+    @_action_sync
     def set_sink_port(self, index, port):
-        context = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
-        self.operation = pa_context_set_sink_port_by_index(self.context, index, port, context, None)
-        self.iterate()
+        self.operation = pa_context_set_sink_port_by_index(self.context, index, port, self.pa_cbs['success'], None)
 
+    @_action_sync
     def set_source_output_volume(self, index, vol):
-        context = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
-        self.operation = pa_context_set_source_output_volume(self.context, index, vol.to_c(), context, None)
-        self.iterate()
+        self.operation = pa_context_set_source_output_volume(self.context, index, vol.to_c(), self.pa_cbs['success'], None)
 
+    @_action_sync
     def set_source_volume(self, index, vol):
-        context = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
-        self.operation = pa_context_set_source_volume_by_index(self.context, index, vol.to_c(), context, None)
-        self.iterate()
+        self.operation = pa_context_set_source_volume_by_index(self.context, index, vol.to_c(), self.pa_cbs['success'], None)
 
+    @_action_sync
     def source_suspend(self, index, suspend):
-        context = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
-        self.operation = pa_context_suspend_source_by_index(self.context, index, suspend, context, None)
-        self.iterate()
+        self.operation = pa_context_suspend_source_by_index(self.context, index, suspend, self.pa_cbs['success'], None)
 
+    @_action_sync
     def set_default_source(self, name):
-        context = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
-        self.operation = pa_context_set_default_source(self.context, name, context, None)
-        self.iterate()
+        self.operation = pa_context_set_default_source(self.context, name, self.pa_cbs['success'], None)
 
+    @_action_sync
     def kill_source(self, index):
-        context = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
-        self.operation = pa_context_kill_source_output(self.context, index, context, None)
-        self.iterate()
+        self.operation = pa_context_kill_source_output(self.context, index, self.pa_cbs['success'], None)
 
+    @_action_sync
     def set_source_port(self, index, port):
-        context = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
-        self.operation = pa_context_set_source_port_by_index(self.context, index, port, context, None)
-        self.iterate()
+        self.operation = pa_context_set_source_port_by_index(self.context, index, port, self.pa_cbs['success'], None)
 
+    @_action_sync
     def source_output_mute(self, index, mute):
-        context = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
-        self.operation = pa_context_set_source_output_mute(self.context, index, mute, context, None)
-        self.iterate()
+        self.operation = pa_context_set_source_output_mute(self.context, index, mute, self.pa_cbs['success'], None)
 
+    @_action_sync
     def source_mute(self, index, mute):
-        context = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
-        self.operation = pa_context_set_source_mute_by_index(self.context, index, mute, context, None)
-        self.iterate()
+        self.operation = pa_context_set_source_mute_by_index(self.context, index, mute, self.pa_cbs['success'], None)
 
+    @_action_sync
     def source_output_move(self, index, s_index):
-        context = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
-        self.operation = pa_context_move_source_output_by_index(self.context, index, s_index, context, None)
-        self.iterate()
+        self.operation = pa_context_move_source_output_by_index(self.context, index, s_index, self.pa_cbs['success'], None)
 
+    @_action_sync
     def set_card_profile(self, index, p_index):
-        context = PA_CONTEXT_SUCCESS_CB_T(self.context_success)
-        self.operation = pa_context_set_card_profile_by_index(self.context, index, p_index, context, None)
-        self.iterate()
-
-    def run(self):
-        self.ret = pointer(c_int(0))
-        pa_mainloop_run(self.mainloop, self.ret)
-
-    def iterate(self, times=1, start=True):
-        if self.error:
-            raise self.error
-        start and self.start_action()
-        self.ret = pointer(c_int())
-        pa_mainloop_iterate(self.mainloop, times, self.ret)
-        while not self.action_done:
-            pa_mainloop_iterate(self.mainloop, times, self.ret)
+        self.operation = pa_context_set_card_profile_by_index(self.context, index, p_index, self.pa_cbs['success'], None)
 
 
 class PulseSink(DebugMixin):
@@ -1097,8 +860,7 @@ class PulseSinkInfo(PulseSink):
             self.active_port = PulsePort(pa_sink_info.active_port.contents)
 
     def __str__(self):
-        return "ID: {}, Name: {}, Mute: {}, {}".format(
-            self.index, self.description.decode(), self.mute, self.volume)
+        return "ID: {}, Name: {}, Mute: {}, {}".format(self.index, self.description.decode(), self.mute, self.volume)
 
 
 class PulseSinkInputInfo(PulseSink):
@@ -1114,8 +876,7 @@ class PulseSinkInputInfo(PulseSink):
 
     def __str__(self):
         if self.client:
-            return "ID: {}, Name: {}, Mute: {}, {}".format(
-                self.index, self.client.name.decode(), self.mute, self.volume)
+            return "ID: {}, Name: {}, Mute: {}, {}".format(self.index, self.client.name.decode(), self.mute, self.volume)
         return "ID: {}, Name: {}, Mute: {}".format(self.index, self.name.decode(), self.mute)
 
 
@@ -1144,8 +905,7 @@ class PulseSourceInfo(PulseSource):
             self.active_port = PulsePort(pa_source_info.active_port.contents)
 
     def __str__(self):
-        return "ID: {}, Name: {}, Mute: {}, {}".format(
-            self.index, self.description.decode(), self.mute, self.volume)
+        return "ID: {}, Name: {}, Mute: {}, {}".format(self.index, self.description.decode(), self.mute, self.volume)
 
 
 class PulseSourceOutputInfo(PulseSource):
@@ -1160,8 +920,7 @@ class PulseSourceOutputInfo(PulseSource):
 
     def __str__(self):
         if self.client:
-            return "ID: {}, Name: {}, Mute: {}, {}".format(
-                self.index, self.client.name.decode(), self.mute, self.volume)
+            return "ID: {}, Name: {}, Mute: {}, {}".format(self.index, self.client.name.decode(), self.mute, self.volume)
         return "ID: {}, Name: {}, Mute: {}".format(self.index, self.name.decode(), self.mute)
 
 
@@ -1181,6 +940,7 @@ class PulseVolume(DebugMixin):
 
     def __str__(self):
         return "Channels: {}, Volumes: {}".format(self.channels, [str(x) + "%" for x in self.values])
+
 
 # ^ lib
 #########################################################################################
@@ -1261,28 +1021,24 @@ class Screen():
     SIDES = {Bar.LEFT: 'Left', Bar.RIGHT: 'Right', Bar.RLEFT: 'Rear Left',
              Bar.RRIGHT: 'Rear Right', Bar.CENTER: 'Center', Bar.SUB: 'Subwoofer',
              Bar.SLEFT: 'Side left', Bar.SRIGHT: 'Side right'}
-    SEQ_TO_KEY = {
-        (91, 49, 59, 50, 67): curses.KEY_SRIGHT,
-        (91, 49, 59, 50, 68): curses.KEY_SLEFT,
-        (79, 80, -1, -1, -1): curses.KEY_F1,
-        (79, 81, -1, -1, -1): curses.KEY_F2,
-        (79, 82, -1, -1, -1): curses.KEY_F3,
-        (79, 72, -1, -1, -1): curses.KEY_HOME,
-        (79, 70, -1, -1, -1): curses.KEY_END,
-        (91, 49, 126, -1, -1): curses.KEY_HOME,
-        (91, 52, 126, -1, -1): curses.KEY_END,
-    }
+    SEQ_TO_KEY = {(91, 49, 59, 50, 67): curses.KEY_SRIGHT,
+                  (91, 49, 59, 50, 68): curses.KEY_SLEFT,
+                  (79, 80, -1, -1, -1): curses.KEY_F1,
+                  (79, 81, -1, -1, -1): curses.KEY_F2,
+                  (79, 82, -1, -1, -1): curses.KEY_F3,
+                  (79, 72, -1, -1, -1): curses.KEY_HOME,
+                  (79, 70, -1, -1, -1): curses.KEY_END,
+                  (91, 49, 126, -1, -1): curses.KEY_HOME,
+                  (91, 52, 126, -1, -1): curses.KEY_END}
 
     def __init__(self, color=2, mouse=True):
-        environ['ESCDELAY'] = '25'
+        os.environ['ESCDELAY'] = '25'
         self.screen = curses.initscr()
-        self.screen.timeout(900)
+        self.screen.nodelay(True)
         self.screen.scrollok(1)
         if mouse:
             try:
-                curses.mousemask(curses.ALL_MOUSE_EVENTS |
-                                 curses.BUTTON1_CLICKED |
-                                 self.KEY_MOUSE |
+                curses.mousemask(curses.ALL_MOUSE_EVENTS | curses.BUTTON1_CLICKED | self.KEY_MOUSE |
                                  functools.reduce(operator.or_, list(self.SCROLL_UP)) |
                                  functools.reduce(operator.or_, list(self.SCROLL_DOWN)))
             except:
@@ -1294,6 +1050,8 @@ class Screen():
         except:  # terminal doesn't support visibility requests
             pass
         self.screen.border(0)
+        self.screen.clear()
+        self.screen.refresh()
         self.index = 0
         self.top_line_num = 0
         self.focus_line_num = 0
@@ -1327,11 +1085,9 @@ class Screen():
                     curses.init_pair(240, 240, -1)
                     curses.init_pair(243, 243, -1)
                     curses.init_pair(246, 246, -1)
-                    self.gray_gradient = [
-                        curses.color_pair(240),
-                        curses.color_pair(243),
-                        curses.color_pair(246),
-                    ]
+                    self.gray_gradient = [curses.color_pair(240),
+                                          curses.color_pair(243),
+                                          curses.color_pair(246)]
                 except:
                     self.gray_gradient = [curses.A_NORMAL] * 3
         else:
@@ -1356,17 +1112,34 @@ class Screen():
         self.selected = None
         self.action = None
         self.server_info = None
+        self.ev = threading.Event()
 
-    def display_line(self, index, line, mod=curses.A_NORMAL):
-        shift = 0
+    def getch(self):
+        # blocking getch, can be 'interrupted' by ev.set
+        self.ev.wait()
+        self.ev.clear()
+        return self.screen.getch()
+
+    def pregetcher(self):
+        # curses.getch doesn't work well with threads
+        # so have to improvise ¯\_(ツ)_/¯
+        while True:
+            select([sys.stdin], [], [], 10)
+            self.ev.set()
+
+    def wake_cb(self, *_):
+        self.ev.set()
+
+    def display_line(self, index, line, mod=curses.A_NORMAL, win=None):
+        shift, win = 0, win or self.screen
         for i in line.split('\n'):
             parts = i.rsplit('|')
             head = ''.join(parts[:-1])
             tail = int(parts[-1] or 0)
             try:
-                self.screen.addstr(index, shift, head, tail | mod)
+                win.addstr(index, shift, head, tail | mod)
             except:
-                self.screen.addstr(min(curses.LINES - 1, index), min(curses.COLS - 1, shift), head, tail | mod)
+                win.addstr(min(curses.LINES - 1, index), min(curses.COLS - 1, shift), head, tail | mod)
             shift += len(head)
 
     def change_mode(self, mode):
@@ -1396,8 +1169,8 @@ class Screen():
                 self.menu_titles[2], curses.A_BOLD if self.mode[2] else curses.A_DIM,
                 "? - help", self.cols - 30, curses.A_DIM)
         else:
-            select = 'output' if type(self.selected[0].pa) is PulseSinkInputInfo else 'input'
-            self.menu = "Select new {} device:|{}".format(select, curses.A_NORMAL)
+            selected = 'output' if type(self.selected[0].pa) is PulseSinkInputInfo else 'input'
+            self.menu = "Select new {} device:|{}".format(selected, curses.A_NORMAL)
 
     def update_info(self):
         focus = self.focus_line_num + self.top_line_num + 1
@@ -1420,23 +1193,6 @@ class Screen():
             "M  ", self.red if bar.muted else curses.A_DIM, name, curses.A_NORMAL)
         self.info += '{:>{}}%|{}'.format(pos, self.cols - len(name) - 6, curses.A_BOLD)
 
-    def resize(self):
-        if curses.is_term_resized(curses.LINES, curses.COLS):
-            self.screen.erase()
-            y, x = self.screen.getmaxyx()
-            curses.resizeterm(y, x)
-            self.submenu.resize(curses.LINES, self.submenu_width + 1)
-            if self.submenu_show:
-                self.submenu_show = False
-                self.focus_line_num = self.modes_data[5][1]
-                self.top_line_num = self.modes_data[5][2]
-            self.helpwin.resize(13, 62)
-            self.helpwin.mvwin((curses.LINES // 2) - 6, (curses.COLS // 2) - 31)
-            self.helpwin_show = False
-            self.screen.refresh()
-        self.lines = curses.LINES - 2
-        self.cols = curses.COLS - 1
-
     def run_mouse(self):
         try:
             _, x, y, _, c = curses.getmouse()
@@ -1446,7 +1202,7 @@ class Screen():
                     if y - 1 <= bottom:
                         self.focus_line_num = max(top, min(bottom, y - 1))
                 else:
-                    f1 = len(self.menu_titles[0]) + 1 # 1 is 'spacing' after the title
+                    f1 = len(self.menu_titles[0]) + 1  # 1 is 'spacing' after the title
                     f2 = f1 + len(self.menu_titles[1]) + 2
                     f3 = f2 + len(self.menu_titles[2]) + 3
                     if x in range(0, f1):
@@ -1459,8 +1215,27 @@ class Screen():
         except curses.error:
             return None
 
-    def sigint(self):
-        # if ^C pressed while doing PULSE.reconnect wrapper.restore won't be called
+    def resize(self):
+        size = os.get_terminal_size()
+        curses.LINES, curses.COLS = size.lines, size.columns
+        curses.resizeterm(curses.LINES, curses.COLS)
+        self.submenu.resize(curses.LINES, self.submenu_width + 1)
+        if self.submenu_show:
+            self.submenu_show = False
+            self.focus_line_num = self.modes_data[5][1]
+            self.top_line_num = self.modes_data[5][2]
+        try:
+            self.helpwin.resize(13, 62)
+            self.helpwin.mvwin((curses.LINES // 2) - 6, (curses.COLS // 2) - 31)
+        except curses.error:
+            pass
+        self.helpwin_show = False
+        self.lines = curses.LINES - 2
+        self.cols = curses.COLS - 1
+        self.ev.set()
+
+    def termiate(self):
+        # if ^C pressed while sleeping in reconnect wrapper.restore won't be called
         # so have to restore it manually here
         self.screen.keypad(0)
         curses.echo()
@@ -1468,20 +1243,31 @@ class Screen():
         curses.endwin()
         sys.exit()
 
+    def reconnect(self):
+        self.focus_line_num = 0
+        self.menu = self.info = str
+        self.data = [(Bar('PA - Connection refused.\nTrying to reconnect.'), Bar.NONE, 0)]
+        while not PULSE.connected:
+            self.display()
+            if self.screen.getch() in (ord('q'), self.ESC_KEY):
+                sys.exit()
+            PULSE.reconnect()
+            sleep(0.2)
+        PULSE.subscribe(self.wake_cb)
+
     def run(self, _):
-        signal.signal(signal.SIGINT, lambda signal, frame: self.sigint())
+        signal.signal(signal.SIGINT, lambda s, f: self.termiate())
+        signal.signal(signal.SIGWINCH, lambda s, f: self.resize())
+        threading.Thread(target=self.pregetcher, daemon=True).start()
+        PULSE.subscribe(self.wake_cb)
+        self.ev.set()
         while True:
             try:
-                self.resize()
                 if not self.submenu_show:
                     try:
                         self.get_data()
                     except RuntimeError:
-                        self.focus_line_num = 0
-                        self.data = [(Bar('PA - Connection refused.\nTrying to reconnect.'), Bar.NONE, 0)]
-                        self.display()
-                        PULSE.reconnect()
-                        continue
+                        self.reconnect()
                     self.update_menu()
                     self.update_info()
                     self.display()
@@ -1499,22 +1285,18 @@ class Screen():
                 self.screen.addstr("{}\n{}\n".format(str(self.mode), str(e)))
                 self.screen.addstr(str(traceback.extract_tb(e.__traceback__)))
 
+            c = self.getch()
+            if c == -1: continue
+
             focus = self.top_line_num + self.focus_line_num
             bar, side = self.data[focus][0], self.data[focus][1]
 
-            c = self.screen.getch()
-
-            if c == -1:
-                continue
-            elif c == self.KEY_MOUSE:
+            if c == self.KEY_MOUSE:
                 c = self.run_mouse() or c
             elif c == 27:
                 # translating key-sequences to keys recognized by curses
-                l = []
-                self.screen.timeout(0)
-                for _ in range(5): l.append(self.screen.getch())
-                self.screen.timeout(900)
-                c = self.SEQ_TO_KEY.get(tuple(l), 27)
+                # happens in screen/tmux or with TERM=screen/tmux
+                c = self.SEQ_TO_KEY.get(tuple([self.screen.getch() for _ in range(5)]), 27)
 
             if c == curses.KEY_F1:
                 self.change_mode(0)
@@ -1621,80 +1403,6 @@ class Screen():
             elif c in self.DIGITS:
                 percent = int(chr(c)) * 10
                 bar.set(100 if percent == 0 else percent, side)
-
-    def run_submenu(self):
-        c = self.screen.getch()
-        if c in (ord('q'), self.ESC_KEY):
-            self.submenu_show = False
-            self.focus_line_num = self.modes_data[5][1]
-            self.top_line_num = self.modes_data[5][2]
-
-        elif c in (curses.KEY_UP, ord('k'), curses.KEY_PPAGE):
-            self.scroll(self.UP, cycle=True)
-        elif c in (curses.KEY_DOWN, ord('j'), curses.KEY_NPAGE):
-            self.scroll(self.DOWN, cycle=True)
-        elif c == curses.KEY_HOME:
-            self.scroll_first()
-        elif c == curses.KEY_END:
-            self.scroll_last()
-
-        elif c == ord('\n'):
-            focus = self.focus_line_num + self.top_line_num
-            self.action = self.submenu_data[focus]
-            if self.action == 'Move':
-                if self.active_mode == 0:
-                    self.change_mode(3)
-                elif self.active_mode == 1:
-                    self.change_mode(4)
-                self.change_mode_allowed = self.submenu_show = False
-                return
-            elif self.action == 'Kill':
-                try:
-                    PULSE.kill_client(self.selected[0].pa.client.index)
-                except:
-                    if type(self.selected[0].pa) is PulseSinkInputInfo:
-                        PULSE.kill_sink(self.selected[2])
-                    else:
-                        PULSE.kill_source(self.selected[2])
-            elif self.action == 'Suspend':
-                if type(self.selected[0].pa) is PulseSinkInfo:
-                    PULSE.sink_suspend(self.selected[2], 1)
-                else:
-                    PULSE.source_suspend(self.selected[2], 1)
-            elif self.action == 'Resume':
-                if type(self.selected[0].pa) is PulseSinkInfo:
-                    PULSE.sink_suspend(self.selected[2], 0)
-                else:
-                    PULSE.source_suspend(self.selected[2], 0)
-            elif self.action == 'Set as default':
-                if type(self.selected[0].pa) is PulseSinkInfo:
-                    PULSE.set_default_sink(self.selected[0].pa.name)
-                else:
-                    PULSE.set_default_source(self.selected[0].pa.name)
-            elif self.action == 'Set port':
-                self.submenu_data = []
-                active = self.selected[0].pa.active_port.description.decode()
-                for port in self.selected[0].pa.ports:
-                    description = port.description.decode()
-                    if active == description:
-                        self.submenu_data.append(' {}|{}'.format(description, self.green))
-                    else:
-                        self.submenu_data.append(' {}|{}'.format(description, 0 if port.available != 1 else self.muted_color))
-                self.focus_line_num = self.top_line_num = 0
-                self.n_lines = len(self.submenu_data)
-                return
-            else:
-                index = self.selected[0].pa.index
-                if type(self.selected[0].pa) is PulseSinkInfo:
-                    PULSE.set_sink_port(index, self.selected[0].pa.ports[focus].name)
-                elif type(self.selected[0].pa) is PulseSourceInfo:
-                    PULSE.set_source_port(index, self.selected[0].pa.ports[focus].name)
-                elif type(self.selected[0].pa) is PulseCard:
-                    PULSE.set_card_profile(index, self.selected[0].pa.profiles[focus].name)
-            self.change_mode_allowed = True
-            self.submenu_show = False
-            self.focus_line_num = self.modes_data[5][1]
-            self.top_line_num = self.modes_data[5][2]
 
     def build(self, target, devices, streams):
         tmp = []
@@ -1835,6 +1543,7 @@ class Screen():
             elif bar.muted:
                 bracket_hl = bracket_hl | self.red
                 focus_hl = focus_hl | self.muted_color
+
             off = 6 * (self.cols // (43 if self.cols <= 60 else 25)) - len(tree)
             cols = self.cols - 31 - off - len(tree)
             vol = list(BAR_OFF * (cols - (cols % 3 != 0)))
@@ -1891,13 +1600,12 @@ class Screen():
         self.helpwin.refresh()
 
     def run_helpwin(self):
-        c = self.screen.getch()
-        if c in (ord('q'), self.ESC_KEY):
+        if self.getch() in (ord('q'), self.ESC_KEY):
             self.helpwin_show = False
 
     def resize_submenu(self):
         key = lambda x: len(x.split('|')[0])
-        self.submenu_width = min(self.cols + 1, max( 30, len( max(self.submenu_data, key=key).split('|')[0]) + 3))
+        self.submenu_width = min(self.cols + 1, max(30, len(max(self.submenu_data, key=key).split('|')[0]) + 3))
         self.submenu.resize(curses.LINES, self.submenu_width + 1)
 
     def display_submenu(self):
@@ -1913,10 +1621,84 @@ class Screen():
                 focus_hl = curses.A_NORMAL
                 arrow = ' '
             if '|' in line:
-                self.display_line(index, ' {}|0\n'.format(arrow) + line, focus_hl)
+                self.display_line(index, ' {}|0\n'.format(arrow) + line, focus_hl, win=self.submenu)
             else:
                 self.submenu.addstr(index, 1, arrow + ' ' + line, focus_hl)
         self.submenu.refresh()
+
+    def run_submenu(self):
+        c = self.getch()
+        if c in (ord('q'), self.ESC_KEY):
+            self.submenu_show = False
+            self.focus_line_num = self.modes_data[5][1]
+            self.top_line_num = self.modes_data[5][2]
+
+        elif c in (curses.KEY_UP, ord('k'), curses.KEY_PPAGE):
+            self.scroll(self.UP, cycle=True)
+        elif c in (curses.KEY_DOWN, ord('j'), curses.KEY_NPAGE):
+            self.scroll(self.DOWN, cycle=True)
+        elif c == curses.KEY_HOME:
+            self.scroll_first()
+        elif c == curses.KEY_END:
+            self.scroll_last()
+
+        elif c == ord('\n'):
+            focus = self.focus_line_num + self.top_line_num
+            self.action = self.submenu_data[focus]
+            if self.action == 'Move':
+                if self.active_mode == 0:
+                    self.change_mode(3)
+                elif self.active_mode == 1:
+                    self.change_mode(4)
+                self.change_mode_allowed = self.submenu_show = False
+                return
+            elif self.action == 'Kill':
+                try:
+                    PULSE.kill_client(self.selected[0].pa.client.index)
+                except:
+                    if type(self.selected[0].pa) is PulseSinkInputInfo:
+                        PULSE.kill_sink(self.selected[2])
+                    else:
+                        PULSE.kill_source(self.selected[2])
+            elif self.action == 'Suspend':
+                if type(self.selected[0].pa) is PulseSinkInfo:
+                    PULSE.sink_suspend(self.selected[2], 1)
+                else:
+                    PULSE.source_suspend(self.selected[2], 1)
+            elif self.action == 'Resume':
+                if type(self.selected[0].pa) is PulseSinkInfo:
+                    PULSE.sink_suspend(self.selected[2], 0)
+                else:
+                    PULSE.source_suspend(self.selected[2], 0)
+            elif self.action == 'Set as default':
+                if type(self.selected[0].pa) is PulseSinkInfo:
+                    PULSE.set_default_sink(self.selected[0].pa.name)
+                else:
+                    PULSE.set_default_source(self.selected[0].pa.name)
+            elif self.action == 'Set port':
+                self.submenu_data = []
+                active = self.selected[0].pa.active_port.description.decode()
+                for port in self.selected[0].pa.ports:
+                    description = port.description.decode()
+                    if active == description:
+                        self.submenu_data.append(' {}|{}'.format(description, self.green))
+                    else:
+                        self.submenu_data.append(' {}|{}'.format(description, 0 if port.available != 1 else self.muted_color))
+                self.focus_line_num = self.top_line_num = 0
+                self.n_lines = len(self.submenu_data)
+                return
+            else:
+                index = self.selected[0].pa.index
+                if type(self.selected[0].pa) is PulseSinkInfo:
+                    PULSE.set_sink_port(index, self.selected[0].pa.ports[focus].name)
+                elif type(self.selected[0].pa) is PulseSourceInfo:
+                    PULSE.set_source_port(index, self.selected[0].pa.ports[focus].name)
+                elif type(self.selected[0].pa) is PulseCard:
+                    PULSE.set_card_profile(index, self.selected[0].pa.profiles[focus].name)
+            self.change_mode_allowed = True
+            self.submenu_show = False
+            self.focus_line_num = self.modes_data[5][1]
+            self.top_line_num = self.modes_data[5][2]
 
     def scroll(self, n, cycle=False):
         next_line_num = self.focus_line_num + n
@@ -1986,8 +1768,7 @@ def main():
     if not noninteractive_opts:
         if sys.stdout.isatty():
             title = 'pulsemixer {}'.format(server.decode() if server else '')
-            sys.stdout.write('\033]2;{}\007'.format(title.strip()))
-            sys.stdout.flush()
+            print('\033]2;{}\007'.format(title.strip()), end='', flush=True)
             curses.wrapper(Screen(color, mouse).run)
         else:
             sys.exit('ERR: output is not a tty-like device')
