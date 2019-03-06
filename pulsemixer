@@ -2,6 +2,7 @@
 '''Usage of pulsemixer:
   -h, --help            show this help message and exit
   -v, --version         print version
+  --create-config       generate configuration file
   -l, --list            list everything
   --list-sources        list sources
   --list-sinks          list sinks
@@ -30,9 +31,11 @@ import signal
 import sys
 import threading
 import traceback
+from configparser import ConfigParser
 from ctypes import *
 from pprint import pprint
 from select import select
+from textwrap import dedent
 from time import sleep
 
 #########################################################################################
@@ -42,19 +45,6 @@ try:
     DLL = CDLL("libpulse.so.0")
 except Exception as err:
     sys.exit(err)
-
-bar_style = os.getenv('PULSEMIXER_BAR_STYLE', '┌╶┐╴└┘▮- ──').ljust(11, '?')
-BAR_TOP_LEFT       = bar_style[0]
-BAR_LEFT_MONO      = bar_style[1]
-BAR_TOP_RIGHT      = bar_style[2]
-BAR_RIGHT_MONO     = bar_style[3]
-BAR_BOTTOM_LEFT    = bar_style[4]
-BAR_BOTTOM_RIGHT   = bar_style[5]
-BAR_ON             = bar_style[6]
-BAR_OFF            = bar_style[7]
-ARROW              = bar_style[8]
-ARROW_FOCUSED      = bar_style[9]
-ARROW_LOCKED       = bar_style[10]
 
 PA_VOLUME_NORM = 65536
 PA_CHANNELS_MAX = 32
@@ -584,6 +574,7 @@ class Pulse(DebugMixin):
         pa_threaded_mainloop_lock(self.mainloop)
         pa_threaded_mainloop_start(self.mainloop)
         pa_threaded_mainloop_wait(self.mainloop) or pa_threaded_mainloop_unlock(self.mainloop)
+        if self.error: sys.exit('Failed to connect to pulseaudio')
         self.connected = True
 
     def wait_and_unlock(self):
@@ -655,8 +646,10 @@ class Pulse(DebugMixin):
         if state == PA_CONTEXT_READY:
             pa_threaded_mainloop_signal(self.mainloop, 0)
         elif state == PA_CONTEXT_FAILED:
-            self.connected = False
             self.error = RuntimeError("Failed to complete action: {}, {}".format(state, pa_context_errno(c)))
+            if not self.connected:   # failed to __init__, can happen with invalid server_name
+                pa_threaded_mainloop_signal(self.mainloop, 0)
+            self.connected = False
             self.pa_dc_cb()
         return 0
 
@@ -1019,7 +1012,6 @@ class Screen():
     SCROLL_UP = [getattr(curses, i, 0) for i in ['BUTTON4_PRESSED', 'BUTTON3_TRIPLE_CLICKED']]
     SCROLL_DOWN = [getattr(curses, i, 0) for i in ['BUTTON5_PRESSED', 'A_LOW', 'A_BOLD', 'BUTTON4_DOUBLE_CLICKED']]
     KEY_MOUSE = getattr(curses, 'KEY_MOUSE', 0)
-    SPACE_KEY = 32
     ESC_KEY = 27
     DIGITS = list(map(ord, map(str, range(10))))
     SIDES = {Bar.LEFT: 'Left', Bar.RIGHT: 'Right', Bar.RLEFT: 'Rear Left',
@@ -1258,6 +1250,7 @@ class Screen():
             PULSE.reconnect()
             sleep(0.2)
         PULSE.subscribe(self.wake_cb)
+        self.ev.set()
 
     def run(self, _):
         signal.signal(signal.SIGINT, lambda s, f: self.termiate())
@@ -1325,7 +1318,7 @@ class Screen():
                             if active == description:
                                 self.submenu_data.append(' {}|{}'.format(description, self.green))
                             else:
-                                self.submenu_data.append(' {}|{}'.format(description, 0 if profile.available else self.muted_color))
+                                self.submenu_data.append(' {}|{}'.format(description, 0 if profile.available else curses.A_DIM))
                     else:
                         self.submenu_data = ['Move', 'Kill']
                     self.submenu_show = True
@@ -1365,7 +1358,7 @@ class Screen():
             if side is Bar.NONE:
                 continue
 
-            if c in (curses.KEY_UP, ord('k'), curses.KEY_PPAGE):
+            if c in CFG.keys.up:
                 if bar.locked:
                     if self.data[focus][1] == 0:
                         n = 1
@@ -1376,7 +1369,7 @@ class Screen():
                     self.scroll(self.UP)
                 if not self.data[self.top_line_num + self.focus_line_num][0]:
                     self.scroll(self.UP)
-            elif c in (curses.KEY_DOWN, ord('j'), curses.KEY_NPAGE):
+            elif c in CFG.keys.down:
                 if bar.locked:
                     if self.data[focus][1] == self.data[focus][3] - 1:
                         n = 1
@@ -1387,23 +1380,23 @@ class Screen():
                     self.scroll(self.DOWN)
                 if not self.data[self.top_line_num + self.focus_line_num][0]:
                     self.scroll(self.DOWN)
-            elif c == curses.KEY_HOME:
+            elif c in CFG.keys.top:
                 self.scroll_first()
-            elif c == curses.KEY_END:
+            elif c in CFG.keys.bottom:
                 self.scroll_last()
 
-            elif c == ord('m'):
+            elif c in CFG.keys.mute:
                 bar.mute_toggle()
-            elif c == self.SPACE_KEY:
+            elif c in CFG.keys.lock:
                 bar.lock_toggle()
-            elif c in (curses.KEY_LEFT, ord('h')) or any([c & i for i in self.SCROLL_DOWN]):
-                bar.move(-1, side)
-            elif c in (curses.KEY_RIGHT, ord('l')) or any([c & i for i in self.SCROLL_UP]):
-                bar.move(1, side)
-            elif c in (curses.KEY_SLEFT, ord('H')):
-                bar.move(-10, side)
-            elif c in (curses.KEY_SRIGHT, ord('L')):
-                bar.move(10, side)
+            elif c in CFG.keys.left or any([c & i for i in self.SCROLL_DOWN]):
+                bar.move(-CFG.general.step, side)
+            elif c in CFG.keys.right or any([c & i for i in self.SCROLL_UP]):
+                bar.move(CFG.general.step, side)
+            elif c in CFG.keys.left_big:
+                bar.move(-CFG.general.step_big, side)
+            elif c in CFG.keys.right_big:
+                bar.move(CFG.general.step_big, side)
             elif c in self.DIGITS:
                 percent = int(chr(c)) * 10
                 bar.set(100 if percent == 0 else percent, side)
@@ -1514,28 +1507,28 @@ class Screen():
                     if bar.stream_index == bar.owned:
                         tree = ' └─'
                 if bar.channels != 1:
-                    brackets = [BAR_TOP_LEFT, BAR_TOP_RIGHT]
+                    brackets = [CFG.style.bar_top_left, CFG.style.bar_top_right]
                 else:
-                    brackets = [BAR_LEFT_MONO, BAR_RIGHT_MONO]
+                    brackets = [CFG.style.bar_left_mono, CFG.style.bar_right_mono]
             elif bartype == bar.channels - 1:
                 if bar.stream_index == bar.owned:
                     tree = ' '
-                brackets = [BAR_BOTTOM_LEFT, BAR_BOTTOM_RIGHT]
+                brackets = [CFG.style.bar_bottom_left, CFG.style.bar_bottom_right]
             else:
                 if bar.stream_index == bar.owned:
                     tree = ' '
                 brackets = ['├', '┤']
 
             # focus current lines
-            focus_hl, bracket_hl, arrow, gradient = 0, 0, ARROW, self.gradient
+            focus_hl, bracket_hl, arrow, gradient = 0, 0, CFG.style.arrow, self.gradient
             if index == self.focus_line_num:
                 focus_hl = bracket_hl = curses.A_BOLD
-                arrow = ARROW_FOCUSED
+                arrow = CFG.style.arrow_focused
             elif bar in same:
                 focus_hl = curses.A_BOLD
                 if bar.locked:
                     bracket_hl = curses.A_BOLD
-                    arrow = ARROW_LOCKED
+                    arrow = CFG.style.arrow_locked
             elif not bar.muted and self.color_mode != 2:
                 gradient = self.gray_gradient
 
@@ -1550,9 +1543,9 @@ class Screen():
 
             off = 6 * (self.cols // (43 if self.cols <= 60 else 25)) - len(tree)
             cols = self.cols - 31 - off - len(tree)
-            vol = list(BAR_OFF * (cols - (cols % 3 != 0)))
+            vol = list(CFG.style.bar_off * (cols - (cols % 3 != 0)))
             n = int(len(vol) * bar.volume[bartype] / bar.maxsize)
-            vol[:n] = BAR_ON * n
+            vol[:n] = CFG.style.bar_on * n
             vol = ''.join(vol)
             if bartype is Bar.LEFT:
                 if bar.pa.name in (self.server_info.default_sink_name, self.server_info.default_source_name):
@@ -1620,7 +1613,7 @@ class Screen():
         for index, line in enumerate(self.submenu_data[top:bottom]):
             if index == self.focus_line_num:
                 focus_hl = curses.A_BOLD
-                arrow = ARROW_FOCUSED
+                arrow = CFG.style.arrow_focused
             else:
                 focus_hl = curses.A_NORMAL
                 arrow = ' '
@@ -1637,13 +1630,13 @@ class Screen():
             self.focus_line_num = self.modes_data[5][1]
             self.top_line_num = self.modes_data[5][2]
 
-        elif c in (curses.KEY_UP, ord('k'), curses.KEY_PPAGE):
+        elif c in CFG.keys.up:
             self.scroll(self.UP, cycle=True)
-        elif c in (curses.KEY_DOWN, ord('j'), curses.KEY_NPAGE):
+        elif c in CFG.keys.down:
             self.scroll(self.DOWN, cycle=True)
-        elif c == curses.KEY_HOME:
+        elif c in CFG.keys.top:
             self.scroll_first()
-        elif c == curses.KEY_END:
+        elif c in CFG.keys.bottom:
             self.scroll_last()
 
         elif c == ord('\n'):
@@ -1687,7 +1680,7 @@ class Screen():
                     if active == description:
                         self.submenu_data.append(' {}|{}'.format(description, self.green))
                     else:
-                        self.submenu_data.append(' {}|{}'.format(description, 0 if port.available != 1 else self.muted_color))
+                        self.submenu_data.append(' {}|{}'.format(description, 0 if port.available != 1 else curses.A_DIM))
                 self.focus_line_num = self.top_line_num = 0
                 self.n_lines = len(self.submenu_data)
                 return
@@ -1732,10 +1725,135 @@ class Screen():
         for _ in range(self.n_lines): self.scroll(self.DOWN)
 
 
-def usage(): print(__doc__)
+class Config():
+
+    def __init__(self):
+
+        class General:
+            step = 1
+            step_big = 10
+            server = None
+
+        class Keys:
+            up          = [ord('k'), curses.KEY_UP, curses.KEY_PPAGE]
+            down        = [ord('j'), curses.KEY_DOWN, curses.KEY_NPAGE]
+            left        = [ord('h'), curses.KEY_LEFT]
+            right       = [ord('l'), curses.KEY_RIGHT]
+            left_big    = [ord('H'), curses.KEY_SLEFT]
+            right_big   = [ord('L'), curses.KEY_SRIGHT]
+            top         = [ord('g'), curses.KEY_HOME]
+            bottom      = [ord('G'), curses.KEY_END]
+            mute        = [ord('m')]
+            lock        = [ord(' ')]
+
+        class UI:
+            # hide_unavailable_ports = False
+            # hide_unavailable_profiles = False
+            # hide_live = False
+            # blip_timeout = 5
+            # cycle = False
+            color = 2
+            mouse = True
+
+        class Style:
+            _bar_style = os.getenv('PULSEMIXER_BAR_STYLE', '┌╶┐╴└┘▮- ──').ljust(11, '?')
+            bar_top_left       = _bar_style[0]
+            bar_left_mono      = _bar_style[1]
+            bar_top_right      = _bar_style[2]
+            bar_right_mono     = _bar_style[3]
+            bar_bottom_left    = _bar_style[4]
+            bar_bottom_right   = _bar_style[5]
+            bar_on             = _bar_style[6]
+            bar_off            = _bar_style[7]
+            arrow              = _bar_style[8]
+            arrow_focused      = _bar_style[9]
+            arrow_locked       = _bar_style[10]
+
+        self.general = General()
+        self.keys = Keys()
+        self.ui = UI()
+        self.style = Style()
+
+        self.path = os.getenv("XDG_CONFIG_HOME", os.path.join(os.path.expanduser("~"), ".config")) + '/pulsemixer.cfg'
+        try:
+            self.load()
+        except Exception as e:
+            sys.exit('ERR: {}'.format(e))
+
+    def save(self):
+        default = '''
+        ;; Everything that starts with "#" or ";" is a comment
+        ;; For the option to take effect simply uncomment it
+
+        [general]
+        step = 1
+        step-big = 10
+        ; server = 
+
+        [keys]
+        ;; To bind "special keys" such as arrows see "Key constant" table in
+        ;; https://docs.python.org/3/library/curses.html#constants
+        ; up        = k, KEY_UP, KEY_PPAGE
+        ; down      = j, KEY_DOWN, KEY_NPAGE
+        ; left      = h, KEY_LEFT
+        ; right     = l, KEY_RIGHT
+        ; left-big  = H, KEY_SLEFT
+        ; right-big = L, KEY_SRIGHT
+        ; top       = g, KEY_HOME
+        ; bottom    = G, KEY_END
+        ; mute      = m
+        ; lock      = ' '  ; 'space', quotes are stripped
+
+        [ui]
+        ; color = 2    ; same as --color, 0 no color, 1 color currently selected, 2 full-color
+        ; mouse = yes
+
+        [style]
+        ;; Pulsemixer will use these characters to draw interface
+        ;; Single characters only
+        ;; Keep in mind that vte-based terminals might have problems displaying wide unicode symbols
+        ;;      https://bugzilla.gnome.org/show_bug.cgi?id=772890
+        ; bar-top-left       = ┌
+        ; bar-left-mono      = ╶
+        ; bar-top-right      = ┐
+        ; bar-right-mono     = ╴
+        ; bar-bottom-left    = └
+        ; bar-bottom-right   = ┘
+        ; bar-on             = ▮
+        ; bar-off            = -
+        ; arrow              = ' '
+        ; arrow-focused      = ─
+        ; arrow-locked       = ─
+        '''
+        directory = self.path.rsplit('/', 1)[0]
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        with open(self.path, 'w') as configfile:
+            configfile.write(dedent(default).strip())
+        return self.path
+
+    def load(self):
+        parser = ConfigParser(inline_comment_prefixes=('#', ';'))
+        if not parser.read(self.path): return
+        def getkeys(s, k):
+            keys = []
+            for i in parser.get(s, k).strip(',').split(','):
+                i = i.strip().strip('"\'')  # in case 'key' is encountered
+                keys.append(getattr(curses, i) if len(i) > 1 else ord(i))
+            return keys
+        get = {str: lambda s, k: parser.get(s, k).strip('"\''),
+               None.__class__: lambda s, k: parser.get(s, k).encode(),
+               list: getkeys, bool: parser.getboolean,
+               int: parser.getint, float: parser.getfloat}
+        for section in parser.sections():
+            for key in parser[section]:
+                pykey = key.replace('-', '_')
+                pyval = getattr(getattr(self, section.lower()), pykey)
+                val = get[type(pyval)](section, key)
+                setattr(getattr(self, section.lower()), pykey, val)
 
 
-PULSE = None
+PULSE = CFG = None
 
 
 def main():
@@ -1744,7 +1862,7 @@ def main():
             sys.argv[1:], "hvl",
             ["help", "version", "list", "list-sinks", "list-sources", "id=",
              "set-volume=", "set-volume-all=", "change-volume=", "get-volume",
-             "get-mute", "toggle-mute", "mute", "unmute",
+             "get-mute", "toggle-mute", "mute", "unmute", "create-config",
              "color=", "server=", "no-mouse"])
     except getopt.GetoptError as err:
         sys.exit("ERR: {}".format(err))
@@ -1752,18 +1870,24 @@ def main():
     dopts = dict(opts)
 
     if '-h' in dopts or '--help' in dopts:
-        sys.exit(usage())
+        sys.exit(print(__doc__))
     if '-v' in dopts or '--version' in dopts:
         sys.exit(print(VERSION))
+    if '--create-config' in dopts:
+        try:
+            sys.exit(print(Config().save()))
+        except Exception as e:  # permission denied and such
+            sys.exit('ERR: {}'.format(e))
 
-    server = dopts.get('--server', '').encode() or None
-    mouse = '--no-mouse' not in dopts
+    global PULSE, CFG
+    CFG = Config()
+    CFG.general.server = dopts.get('--server', '').encode() or CFG.general.server
+    CFG.ui.mouse = False if '--no-mouse' in dopts else CFG.ui.mouse
     try:
-        color = min(2, max(0, int(dopts.get('--color', '') or 2)))
+        CFG.ui.color = min(2, max(0, int(dopts.get('--color', '') or CFG.ui.color)))
     except:
         sys.exit('ERR: color must be a number')
-    global PULSE
-    PULSE = Pulse('pulsemixer', server)
+    PULSE = Pulse('pulsemixer', CFG.general.server)
 
     noninteractive_opts = dict(dopts)
     noninteractive_opts.pop('--server', None)
@@ -1771,9 +1895,9 @@ def main():
     noninteractive_opts.pop('--no-mouse', None)
     if not noninteractive_opts:
         if sys.stdout.isatty():
-            title = 'pulsemixer {}'.format(server.decode() if server else '')
+            title = 'pulsemixer {}'.format(CFG.general.server.decode() if CFG.general.server else '')
             print('\033]2;{}\007'.format(title.strip()), end='', flush=True)
-            curses.wrapper(Screen(color, mouse).run)
+            curses.wrapper(Screen(CFG.ui.color, CFG.ui.mouse).run)
         else:
             sys.exit('ERR: output is not a tty-like device')
 
