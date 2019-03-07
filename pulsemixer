@@ -2,7 +2,6 @@
 '''Usage of pulsemixer:
   -h, --help            show this help message and exit
   -v, --version         print version
-  --create-config       generate configuration file
   -l, --list            list everything
   --list-sources        list sources
   --list-sinks          list sinks
@@ -17,7 +16,8 @@
   --unmute              unmute ID
   --server              choose the server to connect to
   --color n             0 no color, 1 color currently selected, 2 full-color (default)
-  --no-mouse            disable mouse support'''
+  --no-mouse            disable mouse support
+  --create-config       generate configuration file'''
 
 VERSION = '1.4.0'
 
@@ -43,8 +43,8 @@ from time import sleep
 
 try:
     DLL = CDLL("libpulse.so.0")
-except Exception as err:
-    sys.exit(err)
+except Exception as e:
+    sys.exit(e)
 
 PA_VOLUME_NORM = 65536
 PA_CHANNELS_MAX = 32
@@ -1311,14 +1311,7 @@ class Screen():
                         if self.selected[0].pa.n_ports:
                             self.submenu_data.append('Set port')
                     elif type(self.selected[0].pa) is PulseCard:
-                        self.submenu_data = []
-                        active = self.selected[0].pa.active_profile.description.decode()
-                        for profile in self.selected[0].pa.profiles:
-                            description = profile.description.decode()
-                            if active == description:
-                                self.submenu_data.append(' {}|{}'.format(description, self.green))
-                            else:
-                                self.submenu_data.append(' {}|{}'.format(description, 0 if profile.available else curses.A_DIM))
+                        self.fill_submenu_pa(target='profile', off=0, hide=CFG.ui.hide_unavailable_profiles)
                     else:
                         self.submenu_data = ['Move', 'Kill']
                     self.submenu_show = True
@@ -1400,6 +1393,17 @@ class Screen():
             elif c in self.DIGITS:
                 percent = int(chr(c)) * 10
                 bar.set(100 if percent == 0 else percent, side)
+
+    def fill_submenu_pa(self, target, off, hide):
+        self.submenu_data = []
+        active = getattr(self.selected[0].pa, "active_" + target).description.decode()
+        for i in getattr(self.selected[0].pa, target + "s"):
+            description = i.description.decode()
+            if active == description:
+                self.submenu_data.append(' {}|{}'.format(description, self.green))
+            else:
+                if hide and i.available == off: continue
+                self.submenu_data.append(' {}|{}'.format(description, curses.A_DIM if i.available == off else 0))
 
     def build(self, target, devices, streams):
         tmp = []
@@ -1673,14 +1677,7 @@ class Screen():
                 else:
                     PULSE.set_default_source(self.selected[0].pa.name)
             elif self.action == 'Set port':
-                self.submenu_data = []
-                active = self.selected[0].pa.active_port.description.decode()
-                for port in self.selected[0].pa.ports:
-                    description = port.description.decode()
-                    if active == description:
-                        self.submenu_data.append(' {}|{}'.format(description, self.green))
-                    else:
-                        self.submenu_data.append(' {}|{}'.format(description, 0 if port.available != 1 else curses.A_DIM))
+                self.fill_submenu_pa(target='port', off=1, hide=CFG.ui.hide_unavailable_ports)
                 self.focus_line_num = self.top_line_num = 0
                 self.n_lines = len(self.submenu_data)
                 return
@@ -1747,8 +1744,8 @@ class Config():
             lock        = [ord(' ')]
 
         class UI:
-            # hide_unavailable_ports = False
-            # hide_unavailable_profiles = False
+            hide_unavailable_profiles = False
+            hide_unavailable_ports = False
             # hide_live = False
             # blip_timeout = 5
             # cycle = False
@@ -1782,6 +1779,7 @@ class Config():
 
     def save(self):
         default = '''
+        ;; Goes into ~/.config/pulsemixer.cfg, $XDG_CONFIG_HOME respected
         ;; Everything that starts with "#" or ";" is a comment
         ;; For the option to take effect simply uncomment it
 
@@ -1805,6 +1803,8 @@ class Config():
         ; lock      = ' '  ; 'space', quotes are stripped
 
         [ui]
+        ; hide-unavailable-profiles = no
+        ; hide-unavailable-ports = no
         ; color = 2    ; same as --color, 0 no color, 1 color currently selected, 2 full-color
         ; mouse = yes
 
@@ -1864,8 +1864,8 @@ def main():
              "set-volume=", "set-volume-all=", "change-volume=", "get-volume",
              "get-mute", "toggle-mute", "mute", "unmute", "create-config",
              "color=", "server=", "no-mouse"])
-    except getopt.GetoptError as err:
-        sys.exit("ERR: {}".format(err))
+    except getopt.GetoptError as e:
+        sys.exit("ERR: {}".format(e))
     assert args == [], sys.exit('ERR: {} not not recognized'.format(' '.join(args).strip()))
     dopts = dict(opts)
 
