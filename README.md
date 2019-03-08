@@ -5,7 +5,7 @@ cli and curses mixer for pulseaudio
 - `Python` >= 3
 - `PulseAudio` >= 1.0
 
-## Installation:
+## Installation
 
 Pulsemixer is a self-sufficient single-file python script that doesn't require any extra libraries. So you can simply download [pulsemixer](https://raw.githubusercontent.com/GeorgeFilipkin/pulsemixer/master/pulsemixer) manually, do `chmod +x ./pulsemixer` and put it anywhere you want.
 
@@ -138,5 +138,5 @@ step-big = 10
 The old environment variable `PULSEMIXER_BAR_STYLE` is still supported.  
 To change the volume bar's appearance in (e.g.) zsh without creating the config file:
 ```bash
-export PULSEMIXER_BAR_STYLE="┌╶┐╴└┘▮- ──"
+export PULSEMIXER_BAR_STYLE="╭╶╮╴╰╯◆· ──"
 ```
