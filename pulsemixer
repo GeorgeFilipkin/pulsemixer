@@ -1100,9 +1100,9 @@ class Screen():
         self.submenu_show = False
         self.submenu = curses.newwin(curses.LINES, 0, 0, 0)
         self.helpwin_show = False
-        self.helpwin = curses.newwin(13, 62, 0, 0)
+        self.helpwin = curses.newwin(14, 50, 0, 0)
         try:
-            self.helpwin.mvwin((curses.LINES // 2) - 6, (curses.COLS // 2) - 31)
+            self.helpwin.mvwin((curses.LINES // 2) - 7, (curses.COLS // 2) - 25)
         except:
             pass
         self.selected = None
@@ -1221,8 +1221,8 @@ class Screen():
             self.focus_line_num = self.modes_data[5][1]
             self.top_line_num = self.modes_data[5][2]
         try:
-            self.helpwin.resize(13, 62)
-            self.helpwin.mvwin((curses.LINES // 2) - 6, (curses.COLS // 2) - 31)
+            self.helpwin.resize(14, 50)
+            self.helpwin.mvwin((curses.LINES // 2) - 7, (curses.COLS // 2) - 25)
         except curses.error:
             pass
         self.helpwin_show = False
@@ -1265,13 +1265,13 @@ class Screen():
                         self.get_data()
                     except RuntimeError:
                         self.reconnect()
-                    self.update_menu()
-                    self.update_info()
-                    self.display()
                     if self.helpwin_show:
                         self.display_helpwin()
                         self.run_helpwin()
                         continue
+                    self.update_menu()
+                    self.update_info()
+                    self.display()
                 elif self.change_mode_allowed:
                     self.display_submenu()
                     self.run_submenu()
@@ -1343,8 +1343,6 @@ class Screen():
                     self.change_mode(self.old_mode)
                     self.focus_line_num = self.modes_data[5][1]
                     self.top_line_num = self.modes_data[5][2]
-                elif self.helpwin_show:
-                    self.helpwin_show = False
                 else:
                     sys.exit()
 
@@ -1583,21 +1581,22 @@ class Screen():
         self.screen.refresh()
 
     def display_helpwin(self):
-        '''h/j/k/l, arrows               navigation, volume change
-          H/L, Shift+Left/Shift+Right   change volume by 10
-          1/2/3/4/5/6/7/8/9/0           set volume to 10%-100%
-          m                             mute/unmute
-          Space                         lock/unlock channels together
-          Enter                         context menu
-          F1/F2/F3                      change modes
-          Tab                           go to next mode
-          Mouse left click              select device or mode
-          Mouse wheel                   volume change
-          q/Esc/^C                      quit'''
+        '''j k  ↑ ↓                Navigation
+        h l  ← →                Change volume
+        H L  Shift←  Shift→     Change volume by 10
+        1 2 3 .. 8 9 0          Set volume to 10%-100%
+        m                       Mute/Unmute
+        Space                   Lock/Unlock channels
+        Enter                   Context menu
+        F1 F2 F3                Change modes
+        Tab                     Go to next mode
+        Mouse left click        Select device or mode
+        Mouse wheel             Volume change
+        Esc q                   Quit'''
         self.helpwin.erase()
-        self.helpwin.border()
         for i, s in enumerate(self.display_helpwin.__doc__.split('\n')):
-            self.helpwin.addstr(i + 1, 1, s.strip(), curses.A_NORMAL)
+            self.helpwin.addstr(i + 1, 2, s.strip(), curses.A_NORMAL)
+        self.helpwin.border()
         self.helpwin.refresh()
 
     def run_helpwin(self):
