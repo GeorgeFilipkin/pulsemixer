@@ -108,8 +108,13 @@ step-big = 10
 ; right-big = L, KEY_SRIGHT
 ; top       = g, KEY_HOME
 ; bottom    = G, KEY_END
+; mode1     = KEY_F1
+; mode2     = KEY_F2
+; mode3     = KEY_F3
+; next-mode = KEY_TAB
 ; mute      = m
 ; lock      = ' '  ; 'space', quotes are stripped
+; quit      = q, KEY_ESC
 
 [ui]
 ; hide-unavailable-profiles = no

@@ -1012,7 +1012,6 @@ class Screen():
     SCROLL_UP = [getattr(curses, i, 0) for i in ['BUTTON4_PRESSED', 'BUTTON3_TRIPLE_CLICKED']]
     SCROLL_DOWN = [getattr(curses, i, 0) for i in ['BUTTON5_PRESSED', 'A_LOW', 'A_BOLD', 'BUTTON4_DOUBLE_CLICKED']]
     KEY_MOUSE = getattr(curses, 'KEY_MOUSE', 0)
-    ESC_KEY = 27
     DIGITS = list(map(ord, map(str, range(10))))
     SIDES = {Bar.LEFT: 'Left', Bar.RIGHT: 'Right', Bar.RLEFT: 'Rear Left',
              Bar.RRIGHT: 'Rear Right', Bar.CENTER: 'Center', Bar.SUB: 'Subwoofer',
@@ -1245,7 +1244,7 @@ class Screen():
         self.data = [(Bar('PA - Connection refused.\nTrying to reconnect.'), Bar.NONE, 0)]
         while not PULSE.connected:
             self.display()
-            if self.screen.getch() in (ord('q'), self.ESC_KEY):
+            if self.screen.getch() in CFG.keys.quit:
                 sys.exit()
             PULSE.reconnect()
             sleep(0.2)
@@ -1295,11 +1294,11 @@ class Screen():
                 # happens in screen/tmux or with TERM=screen/tmux
                 c = self.SEQ_TO_KEY.get(tuple([self.screen.getch() for _ in range(5)]), 27)
 
-            if c == curses.KEY_F1:
+            if c in CFG.keys.mode1:
                 self.change_mode(0)
-            elif c == curses.KEY_F2:
+            elif c in CFG.keys.mode2:
                 self.change_mode(1)
-            elif c == curses.KEY_F3:
+            elif c in CFG.keys.mode3:
                 self.change_mode(2)
             elif c == ord('?'):
                 self.helpwin_show = True
@@ -1334,9 +1333,9 @@ class Screen():
                         self.top_line_num = self.modes_data[5][2]
                     else:
                         self.change_mode(self.old_mode)
-            elif c == ord('\t'):
+            elif c in CFG.keys.next_mode:
                 self.next_mode()
-            elif c in (ord('q'), self.ESC_KEY):
+            elif c in CFG.keys.quit:
                 if not self.change_mode_allowed:
                     self.submenu_show = False
                     self.change_mode_allowed = True
@@ -1600,7 +1599,7 @@ class Screen():
         self.helpwin.refresh()
 
     def run_helpwin(self):
-        if self.getch() in (ord('q'), self.ESC_KEY):
+        if self.getch() in CFG.keys.quit:
             self.helpwin_show = False
 
     def resize_submenu(self):
@@ -1628,7 +1627,7 @@ class Screen():
 
     def run_submenu(self):
         c = self.getch()
-        if c in (ord('q'), self.ESC_KEY):
+        if c in CFG.keys.quit:
             self.submenu_show = False
             self.focus_line_num = self.modes_data[5][1]
             self.top_line_num = self.modes_data[5][2]
@@ -1730,6 +1729,7 @@ class Config():
             step_big = 10
             server = None
 
+        self._more_keys = {'KEY_ESC': 27, 'KEY_TAB': 9}
         class Keys:
             up          = [ord('k'), curses.KEY_UP, curses.KEY_PPAGE]
             down        = [ord('j'), curses.KEY_DOWN, curses.KEY_NPAGE]
@@ -1739,8 +1739,13 @@ class Config():
             right_big   = [ord('L'), curses.KEY_SRIGHT]
             top         = [ord('g'), curses.KEY_HOME]
             bottom      = [ord('G'), curses.KEY_END]
+            mode1       = [curses.KEY_F1]
+            mode2       = [curses.KEY_F2]
+            mode3       = [curses.KEY_F3]
+            next_mode   = [self._more_keys['KEY_TAB']]
             mute        = [ord('m')]
             lock        = [ord(' ')]
+            quit        = [ord('q'), self._more_keys['KEY_ESC']]
 
         class UI:
             hide_unavailable_profiles = False
@@ -1798,8 +1803,13 @@ class Config():
         ; right-big = L, KEY_SRIGHT
         ; top       = g, KEY_HOME
         ; bottom    = G, KEY_END
+        ; mode1     = KEY_F1
+        ; mode2     = KEY_F2
+        ; mode3     = KEY_F3
+        ; next-mode = KEY_TAB
         ; mute      = m
         ; lock      = ' '  ; 'space', quotes are stripped
+        ; quit      = q, KEY_ESC
 
         [ui]
         ; hide-unavailable-profiles = no
@@ -1838,7 +1848,9 @@ class Config():
             keys = []
             for i in parser.get(s, k).strip(',').split(','):
                 i = i.strip().strip('"\'')  # in case 'key' is encountered
-                keys.append(getattr(curses, i) if len(i) > 1 else ord(i))
+                key = getattr(curses, i, self._more_keys.get(i)) if len(i) > 1 else ord(i)
+                if key is None: raise Exception("module 'curses' has no attribute {}".format(i))
+                keys.append(key)
             return keys
         get = {str: lambda s, k: parser.get(s, k).strip('"\''),
                None.__class__: lambda s, k: parser.get(s, k).encode(),
