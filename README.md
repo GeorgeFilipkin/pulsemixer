@@ -138,6 +138,11 @@ step-big = 10
 ; arrow              = ' '
 ; arrow-focused      = ─
 ; arrow-locked       = ─
+; default-stream     = *
+; info-locked        = L
+; info-unlocked      = L
+; info-muted         = M  ; 🔇
+; info-unmuted       = M  ; 🔉
 ```
 
 The old environment variable `PULSEMIXER_BAR_STYLE` is still supported.  

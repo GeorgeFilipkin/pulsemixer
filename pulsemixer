@@ -1181,12 +1181,11 @@ class Screen():
         side = 'All' if bar.locked else 'Mono' if bar.channels == 1 else self.SIDES[side]
         pos = int(focus * 100 / self.n_lines)
         name = '{}: {}'.format(bar.fullname, side)
-        if len(name) > self.cols - 14:
-            name = '{}: {}'.format(bar.fullname[:self.cols - (18 + len(side))], side)
-        self.info = '{}|{}\n{}|{}\n{}|{}\n'.format(
-            "L ", self.red if bar.locked else curses.A_DIM,
-            "M  ", self.red if bar.muted else curses.A_DIM, name, curses.A_NORMAL)
-        self.info += '{:>{}}%|{}'.format(pos, self.cols - len(name) - 6, curses.A_BOLD)
+        if len(name) > self.cols - 12:
+            name = '{}: {}'.format(bar.fullname[:self.cols - (16 + len(side))].strip(), side)
+        locked = '{}|{}'.format(CFG.style.info_locked, self.red) if bar.locked else '{}|{}'.format(CFG.style.info_unlocked, curses.A_DIM)
+        muted  = '{}|{}'.format(CFG.style.info_muted, self.red) if bar.muted else '{}|{}'.format(CFG.style.info_unmuted, curses.A_DIM)
+        self.info = '{}\n {}\n  {}|{}\n{:>{}}%|{}'.format(locked, muted, name, curses.A_NORMAL, pos, self.cols - len(name) - 6, curses.A_BOLD)
 
     def run_mouse(self):
         try:
@@ -1550,7 +1549,7 @@ class Screen():
             vol = ''.join(vol)
             if bartype is Bar.LEFT:
                 if bar.pa.name in (self.server_info.default_sink_name, self.server_info.default_source_name):
-                    tree = '*'
+                    tree = CFG.style.default_stream
                 name = '{}{}'.format(bar.name, bar.media_name)
                 name = name[:20 + off] + '~' if len(name) > 20 + off else name
                 line = '{:<{}}|{}\n {:<3}|{}\n '.format(name, 22 + off, focus_hl,
@@ -1769,6 +1768,11 @@ class Config():
             arrow              = _bar_style[8]
             arrow_focused      = _bar_style[9]
             arrow_locked       = _bar_style[10]
+            default_stream     = '*'
+            info_locked        = 'L'
+            info_unlocked      = 'U'
+            info_muted         = 'M'
+            info_unmuted       = 'M'
 
         self.general = General()
         self.keys = Keys()
@@ -1833,6 +1837,11 @@ class Config():
         ; arrow              = ' '
         ; arrow-focused      = ─
         ; arrow-locked       = ─
+        ; default-stream     = *
+        ; info-locked        = L
+        ; info-unlocked      = U
+        ; info-muted         = M  ; 🔇
+        ; info-unmuted       = M  ; 🔉
         '''
         directory = self.path.rsplit('/', 1)[0]
         if not os.path.exists(directory):
