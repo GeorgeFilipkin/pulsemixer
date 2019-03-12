@@ -9,6 +9,7 @@
   --set-volume n        set volume for ID
   --set-volume-all n:n  set volume for ID (for every channel)
   --change-volume +-n   change volume for ID
+  --max-volume n        set volume to n if volume is higher than n
   --get-mute            get mute for ID
   --toggle-mute         toggle mute for ID
   --get-volume          get volume for ID
@@ -1883,7 +1884,7 @@ def main():
             ["help", "version", "list", "list-sinks", "list-sources", "id=",
              "set-volume=", "set-volume-all=", "change-volume=", "get-volume",
              "get-mute", "toggle-mute", "mute", "unmute", "create-config",
-             "color=", "server=", "no-mouse"])
+             "color=", "server=", "no-mouse", "max-volume="])
     except getopt.GetoptError as e:
         sys.exit("ERR: {}".format(e))
     assert args == [], sys.exit('ERR: {} not not recognized'.format(' '.join(args).strip()))
@@ -2009,6 +2010,13 @@ def main():
             vol = streams[index].volume
             for i, _ in enumerate(vol.values):
                 vol.values[i] += int(arg)
+            PULSE.set_volume(streams[index], vol)
+
+        elif opt == '--max-volume':
+            check_n(arg, err='max volume')
+            vol = streams[index].volume
+            for i, _ in enumerate(vol.values):
+                vol.values[i] = min(vol.values[i], int(arg))
             PULSE.set_volume(streams[index], vol)
 
 

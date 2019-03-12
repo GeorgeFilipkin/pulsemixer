@@ -35,6 +35,7 @@ Usage of pulsemixer:
   --set-volume n        set volume for ID
   --set-volume-all n:n  set volume for ID (for every channel)
   --change-volume +-n   change volume for ID
+  --max-volume n        set volume to n if volume is higher than n
   --get-mute            get mute for ID
   --toggle-mute         toggle mute for ID
   --get-volume          get volume for ID
