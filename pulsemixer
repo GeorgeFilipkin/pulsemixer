@@ -34,6 +34,7 @@ import threading
 import traceback
 from configparser import ConfigParser
 from ctypes import *
+from itertools import takewhile
 from pprint import pprint
 from select import select
 from textwrap import dedent
@@ -1017,15 +1018,10 @@ class Screen():
     SIDES = {Bar.LEFT: 'Left', Bar.RIGHT: 'Right', Bar.RLEFT: 'Rear Left',
              Bar.RRIGHT: 'Rear Right', Bar.CENTER: 'Center', Bar.SUB: 'Subwoofer',
              Bar.SLEFT: 'Side left', Bar.SRIGHT: 'Side right'}
-    SEQ_TO_KEY = {(91, 49, 59, 50, 67): curses.KEY_SRIGHT,
-                  (91, 49, 59, 50, 68): curses.KEY_SLEFT,
-                  (79, 80, -1, -1, -1): curses.KEY_F1,
-                  (79, 81, -1, -1, -1): curses.KEY_F2,
-                  (79, 82, -1, -1, -1): curses.KEY_F3,
-                  (79, 72, -1, -1, -1): curses.KEY_HOME,
-                  (79, 70, -1, -1, -1): curses.KEY_END,
-                  (91, 49, 126, -1, -1): curses.KEY_HOME,
-                  (91, 52, 126, -1, -1): curses.KEY_END}
+    SEQ_TO_KEY = {159: curses.KEY_F1, 160: curses.KEY_F2, 161: curses.KEY_F3,
+                  316: curses.KEY_SRIGHT, 317: curses.KEY_SLEFT,
+                  151: curses.KEY_HOME, 266: curses.KEY_HOME,
+                  149: curses.KEY_END, 269: curses.KEY_END}
 
     def __init__(self, color=2, mouse=True):
         os.environ['ESCDELAY'] = '25'
@@ -1114,7 +1110,11 @@ class Screen():
         # blocking getch, can be 'interrupted' by ev.set
         self.ev.wait()
         self.ev.clear()
-        return self.screen.getch()
+        c = self.screen.getch()
+        if c == 27:  # collect escape sequences as a single key
+            seq_sum = sum(takewhile(lambda x: x != -1, [self.screen.getch() for _ in range(5)]))
+            c = self.SEQ_TO_KEY.get(seq_sum, seq_sum + 128 if seq_sum else 27)
+        return c
 
     def pregetcher(self):
         # curses.getch doesn't work well with threads
@@ -1289,10 +1289,6 @@ class Screen():
 
             if c == self.KEY_MOUSE:
                 c = self.run_mouse() or c
-            elif c == 27:
-                # translating key-sequences to keys recognized by curses
-                # happens in screen/tmux or with TERM=screen/tmux
-                c = self.SEQ_TO_KEY.get(tuple([self.screen.getch() for _ in range(5)]), 27)
 
             if c in CFG.keys.mode1:
                 self.change_mode(0)
@@ -1729,7 +1725,7 @@ class Config():
             step_big = 10
             server = None
 
-        self._more_keys = {'KEY_ESC': 27, 'KEY_TAB': 9}
+        self._more_keys = {'KEY_ESC': 27, 'KEY_TAB': 9, 'C': -96, 'M': 128}
         class Keys:
             up          = [ord('k'), curses.KEY_UP, curses.KEY_PPAGE]
             down        = [ord('j'), curses.KEY_DOWN, curses.KEY_NPAGE]
@@ -1858,12 +1854,19 @@ class Config():
             keys = []
             for i in parser.get(s, k).strip(',').split(','):
                 i = i.strip().strip('"\'')  # in case 'key' is encountered
-                key = getattr(curses, i, self._more_keys.get(i)) if len(i) > 1 else ord(i)
+                if len(i) > 1:
+                    if i.startswith(('C-', 'M-')):
+                        mod, key = i.split('-')
+                        key = self._more_keys[mod] + ord(key.lower())
+                    else:
+                        key = getattr(curses, i, self._more_keys.get(i))
+                else:
+                    key = ord(i)
                 if key is None: raise Exception("module 'curses' has no attribute {}".format(i))
                 keys.append(key)
             return keys
         get = {str: lambda s, k: parser.get(s, k).strip('"\''),
-               None.__class__: lambda s, k: parser.get(s, k).encode(),
+               None.__class__: lambda s, k: parser.get(s, k).encode(),  # server
                list: getkeys, bool: parser.getboolean,
                int: parser.getint, float: parser.getfloat}
         for section in parser.sections():
@@ -1872,7 +1875,6 @@ class Config():
                 pyval = getattr(getattr(self, section.lower()), pykey)
                 val = get[type(pyval)](section, key)
                 setattr(getattr(self, section.lower()), pykey, val)
-
 
 PULSE = CFG = None
 
