@@ -68,24 +68,25 @@ Interactive mode is used when no arguments were given (except `--color` and `--s
 
 Interactive controls:
 ```
- j k  ↑ ↓                Navigation
- h l  ← →                Change volume
- H L  Shift←  Shift→     Change volume by 10
+ j k   ↑ ↓               Navigation
+ h l   ← →               Change volume
+ H L   Shift←  Shift→    Change volume by 10
  1 2 3 .. 8 9 0          Set volume to 10%-100%
  m                       Mute/Unmute
  Space                   Lock/Unlock channels
  Enter                   Context menu
  F1 F2 F3                Change modes
- Tab                     Go to next mode
- Mouse left click        Select device or mode
+ Tab   Shift Tab         Next/Previous mode
+ Mouse click             Select device or mode
  Mouse wheel             Volume change
  Esc q                   Quit
+
 ```
 
 Via context menu it is possible to `set-default-sink`, `set-default-source`, `move-sink-input`, `move-source-output`, `suspend-sink`, `suspend-source`, `set-sink-port`, `set-source-port`, `kill-client`, `kill-sink-input`, `kill-source-output`, `set-card-profile`. See `man pactl` for details on these features.
 
 ## Configuration
-
+Optional.  
 The config file will not be created automatically. Do `pulsemixer --create-config` or copy-paste it from here.
 
 ```ini
@@ -113,6 +114,7 @@ step-big = 10
 ; mode2     = KEY_F2
 ; mode3     = KEY_F3
 ; next-mode = KEY_TAB
+; prev-mode = KEY_BTAB
 ; mute      = m
 ; lock      = ' '  ; 'space', quotes are stripped
 ; quit      = q, KEY_ESC
@@ -141,7 +143,7 @@ step-big = 10
 ; arrow-locked       = ─
 ; default-stream     = *
 ; info-locked        = L
-; info-unlocked      = L
+; info-unlocked      = U
 ; info-muted         = M  ; 🔇
 ; info-unmuted       = M  ; 🔉
 ```
