@@ -1151,10 +1151,10 @@ class Screen():
         self.active_mode = mode
         self.get_data()
 
-    def next_mode(self):
+    def cycle_mode(self, direction=1):
         for mode, active in self.mode.items():
             if active == 1:
-                self.change_mode((1 + mode) % 3)
+                self.change_mode((mode + direction) % 3)
                 return
 
     def update_menu(self):
@@ -1330,7 +1330,9 @@ class Screen():
                     else:
                         self.change_mode(self.old_mode)
             elif c in CFG.keys.next_mode:
-                self.next_mode()
+                self.cycle_mode()
+            elif c in CFG.keys.prev_mode:
+                self.cycle_mode(direction=-1)
             elif c in CFG.keys.quit:
                 if not self.change_mode_allowed:
                     self.submenu_show = False
@@ -1576,16 +1578,16 @@ class Screen():
         self.screen.refresh()
 
     def display_helpwin(self):
-        '''j k  ↑ ↓                Navigation
-        h l  ← →                Change volume
-        H L  Shift←  Shift→     Change volume by 10
+        '''j k   ↑ ↓               Navigation
+        h l   ← →               Change volume
+        H L   Shift←  Shift→    Change volume by 10
         1 2 3 .. 8 9 0          Set volume to 10%-100%
         m                       Mute/Unmute
         Space                   Lock/Unlock channels
         Enter                   Context menu
         F1 F2 F3                Change modes
-        Tab                     Go to next mode
-        Mouse left click        Select device or mode
+        Tab   Shift Tab         Next/Previous mode
+        Mouse click             Select device or mode
         Mouse wheel             Volume change
         Esc q                   Quit'''
         self.helpwin.erase()
@@ -1739,6 +1741,7 @@ class Config():
             mode2       = [curses.KEY_F2]
             mode3       = [curses.KEY_F3]
             next_mode   = [self._more_keys['KEY_TAB']]
+            prev_mode   = [curses.KEY_BTAB]
             mute        = [ord('m')]
             lock        = [ord(' ')]
             quit        = [ord('q'), self._more_keys['KEY_ESC']]
@@ -1808,6 +1811,7 @@ class Config():
         ; mode2     = KEY_F2
         ; mode3     = KEY_F3
         ; next-mode = KEY_TAB
+        ; prev-mode = KEY_BTAB
         ; mute      = m
         ; lock      = ' '  ; 'space', quotes are stripped
         ; quit      = q, KEY_ESC
