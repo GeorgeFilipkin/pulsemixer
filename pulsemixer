@@ -1047,7 +1047,7 @@ class Screen():
         self.index = 0
         self.top_line_num = 0
         self.focus_line_num = 0
-        self.lines, self.cols = curses.LINES - 1, curses.COLS - 1
+        self.lines, self.cols = curses.LINES - 2, curses.COLS - 1
         self.info, self.menu = str, str
         self.menu_titles = ['F1 Output', 'F2 Input', 'F3 Cards']
         self.data = []
@@ -1169,7 +1169,7 @@ class Screen():
             self.menu = "Select new {} device:|{}".format(selected, curses.A_NORMAL)
 
     def update_info(self):
-        focus = self.focus_line_num + self.top_line_num + 1
+        focus, bottom = self.focus_line_num + self.top_line_num + 1, self.top_line_num + self.lines
         try:
             bar, side = self.data[focus - 1][0], self.data[focus - 1][1]
         except IndexError:
@@ -1180,13 +1180,13 @@ class Screen():
             self.info = str
             return
         side = 'All' if bar.locked else 'Mono' if bar.channels == 1 else self.SIDES[side]
-        pos = int(focus * 100 / self.n_lines)
+        more = '↕' if bottom < self.n_lines and self.top_line_num > 0 else '↑' if self.top_line_num > 0 else '↓' if bottom < self.n_lines else ' '
         name = '{}: {}'.format(bar.fullname, side)
-        if len(name) > self.cols - 12:
-            name = '{}: {}'.format(bar.fullname[:self.cols - (16 + len(side))].strip(), side)
+        if len(name) > self.cols - 8:
+            name = '{}: {}'.format(bar.fullname[:self.cols - (10 + len(side))].strip(), side)
         locked = '{}|{}'.format(CFG.style.info_locked, self.red) if bar.locked else '{}|{}'.format(CFG.style.info_unlocked, curses.A_DIM)
         muted  = '{}|{}'.format(CFG.style.info_muted, self.red) if bar.muted else '{}|{}'.format(CFG.style.info_unmuted, curses.A_DIM)
-        self.info = '{}\n {}\n  {}|{}\n{:>{}}%|{}'.format(locked, muted, name, curses.A_NORMAL, pos, self.cols - len(name) - 6, curses.A_BOLD)
+        self.info = '{}\n {}\n  {}|{}\n{:>{}}|0'.format(locked, muted, name, curses.A_NORMAL, more, self.cols - len(name) - 5)
 
     def run_mouse(self):
         try:
@@ -1225,8 +1225,7 @@ class Screen():
         except curses.error:
             pass
         self.helpwin_show = False
-        self.lines = curses.LINES - 2
-        self.cols = curses.COLS - 1
+        self.lines, self.cols = curses.LINES - 2, curses.COLS - 1
         self.ev.set()
 
     def termiate(self):
