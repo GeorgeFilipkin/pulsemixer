@@ -668,7 +668,11 @@ class Pulse(DebugMixin):
         def wrapper(self, *args):
             if self.error: raise self.error
             pa_threaded_mainloop_lock(self.mainloop)
-            func(self, *args)
+            try:
+                func(self, *args)
+            except Exception as e:
+                pa_threaded_mainloop_unlock(self.mainloop)
+                raise e
             self.wait_and_unlock()
             data, self.data = self.data, []
             return data or []
@@ -1263,6 +1267,8 @@ class Screen():
                         self.get_data()
                     except RuntimeError:
                         self.reconnect()
+                    except IndexError:
+                        self.scroll(self.UP)
                     if self.helpwin_show:
                         self.display_helpwin()
                         self.run_helpwin()
