@@ -1,21 +1,15 @@
 # pulsemixer
-cli and curses mixer for pulseaudio
+CLI and curses mixer for PulseAudio
 
-### Requirements
-- `Python` >= 3
+#### Requirements
+- `Python` >= 3.3
 - `PulseAudio` >= 1.0
 
 ## Installation
 
-Pulsemixer is a self-sufficient single-file python script that doesn't require any extra libraries. So you can simply download [pulsemixer](https://raw.githubusercontent.com/GeorgeFilipkin/pulsemixer/master/pulsemixer) manually, do `chmod +x ./pulsemixer` and put it anywhere you want.
+Pulsemixer is a self-sufficient single-file python script that doesn't require any extra libraries. You can simply download [pulsemixer](https://raw.githubusercontent.com/GeorgeFilipkin/pulsemixer/master/pulsemixer) manually, do `chmod +x ./pulsemixer` and put it anywhere you want.
 
 Below are some more convenient ways to install pulsemixer:
-
-##### pip
-
-```
-pip3 install pulsemixer
-```
 
 ##### curl
 
@@ -23,45 +17,14 @@ pip3 install pulsemixer
 curl https://raw.githubusercontent.com/GeorgeFilipkin/pulsemixer/master/pulsemixer > pulsemixer && chmod +x ./pulsemixer
 ```
 
-## CLI usage
+##### pip
+
 ```
-Usage of pulsemixer:
-  -h, --help            show this help message and exit
-  -v, --version         print version
-  -l, --list            list everything
-  --list-sources        list sources
-  --list-sinks          list sinks
-  --id ID               specify ID. If no ID specified - default sink is used
-  --set-volume n        set volume for ID
-  --set-volume-all n:n  set volume for ID (for every channel)
-  --change-volume +-n   change volume for ID
-  --max-volume n        set volume to n if volume is higher than n
-  --get-mute            get mute for ID
-  --toggle-mute         toggle mute for ID
-  --get-volume          get volume for ID
-  --mute                mute ID
-  --unmute              unmute ID
-  --server              choose the server to connect to
-  --color n             0 no color, 1 color currently selected, 2 full-color (default)
-  --no-mouse            disable mouse support
-  --create-config       generate configuration file
-```
-It is possible to repeat arguments:
-```
-pulsemixer --get-volume --change-volume +5 --get-volume
-65 65
-70 70
-```
-And chain commands with a single call. For example you could do this:
-```
-pulsemixer --id 470 --get-volume --id 2 --get-volume --change-volume +5 --get-volume
-90 90
-100 100
-105 105
+pip3 install pulsemixer
 ```
 
 ## Interactive mode
-Interactive mode is used when no arguments were given (except `--color` and `--server`)
+Interactive mode is used if no arguments are given (except `--color` and `--server`)
 
 ![Image of 1](https://raw.githubusercontent.com/GeorgeFilipkin/pulsemixer/img/1.png)
 ![Image of 2](https://raw.githubusercontent.com/GeorgeFilipkin/pulsemixer/img/2.png)
@@ -80,10 +43,74 @@ Interactive controls:
  Mouse click             Select device or mode
  Mouse wheel             Volume change
  Esc q                   Quit
-
 ```
 
 Via context menu it is possible to `set-default-sink`, `set-default-source`, `move-sink-input`, `move-source-output`, `suspend-sink`, `suspend-source`, `set-sink-port`, `set-source-port`, `kill-client`, `kill-sink-input`, `kill-source-output`, `set-card-profile`. See `man pactl` for details on these features.
+
+## CLI
+```
+Usage of pulsemixer:
+  -h, --help            show this help message and exit
+  -v, --version         print version
+  -l, --list            list everything
+  --list-sources        list sources
+  --list-sinks          list sinks
+  --id ID               specify ID, default sink is used if no ID specified
+  --get-volume          get volume for ID
+  --set-volume n        set volume for ID
+  --set-volume-all n:n  set volume for ID, for every channel
+  --change-volume +-n   change volume for ID
+  --max-volume n        set volume to n if volume is higher than n
+  --get-mute            get mute for ID
+  --mute                mute ID
+  --unmute              unmute ID
+  --toggle-mute         toggle mute for ID
+  --server              choose the server to connect to
+  --color n             0 no color, 1 color currently selected, 2 full-color
+  --no-mouse            disable mouse support
+  --create-config       generate configuration file
+```
+
+#### CLI examples
+Pulsemixer follows PulseAudio's terminology:
+* Sink - an output device.
+* Source - an input device.
+* Sink input - a stream that is connected to an output device, i.e. an input for a sink.
+* Source output - a stream that is connected to an input device, i.e. an output of a source.
+
+```sh
+$ pulsemixer --list
+Sink:          ID: sink-1, Name: Built-in Stereo, Mute: 0, Channels: 2, Volumes: ['60%', '60%'], Default
+Sink:          ID: sink-3, Name: HDMI Audio (HDMI 2), Mute: 0, Channels: 2, Volumes: ['50%', '50%']
+Sink input:    ID: sink-input-663, Name: Firefox, Mute: 0, Channels: 2, Volumes: ['60%', '60%']
+Sink input:    ID: sink-input-686, Name: mocp, Mute: 0, Channels: 2, Volumes: ['60%', '60%']
+Source:        ID: source-1, Name: HDMI Audio (HDMI 2), Mute: 0, Channels: 2, Volumes: ['100%', '100%']
+Source:        ID: source-2, Name: Built-in Stereo, Mute: 0, Channels: 2, Volumes: ['40%', '40%'], Default
+Source output: ID: source-output-7, Name: arecord, Mute: 0, Channels: 1, Volumes: ['40%]
+```
+
+Print volume of the default sink, decrease by 5, print new volume:
+```sh
+$ pulsemixer --get-volume --change-volume -5 --get-volume
+60 60
+55 55
+```
+
+Toggle mute of `source-1`, print mute status:
+```sh
+$ pulsemixer --id source-1 --toggle-mute --get-mute
+1
+```
+
+Set volume of `sink-input-663` to 50, then set volume of `sink-3` to 10 (left channel) and 30 (right channel):
+```sh
+$ pulsemixer --id sink-input-663 --set-volume 50 --id sink-3 --set-volume-all 10:30
+```
+
+Increase volume of `sink-input-686` by 10 but don't get past 100:
+```sh
+$ pulsemixer --id sink-input-686 --change-volume +10 --max-volume 100
+```
 
 ## Configuration
 Optional.  
@@ -153,3 +180,7 @@ To change the volume bar's appearance in (e.g.) zsh without creating the config 
 ```bash
 export PULSEMIXER_BAR_STYLE="╭╶╮╴╰╯◆· ──"
 ```
+
+## See also
+
+[python-pulse-control](https://github.com/mk-fg/python-pulse-control) - Python high-level interface and ctypes-based bindings for PulseAudio.
