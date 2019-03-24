@@ -5,16 +5,16 @@
   -l, --list            list everything
   --list-sources        list sources
   --list-sinks          list sinks
-  --id ID               specify ID. If no ID specified - default sink is used
+  --id ID               specify ID, default sink is used if no ID specified
+  --get-volume          get volume for ID
   --set-volume n        set volume for ID
-  --set-volume-all n:n  set volume for ID (for every channel)
+  --set-volume-all n:n  set volume for ID, for every channel
   --change-volume +-n   change volume for ID
   --max-volume n        set volume to n if volume is higher than n
   --get-mute            get mute for ID
-  --toggle-mute         toggle mute for ID
-  --get-volume          get volume for ID
   --mute                mute ID
   --unmute              unmute ID
+  --toggle-mute         toggle mute for ID
   --server              choose the server to connect to
   --color n             0 no color, 1 color currently selected, 2 full-color
   --no-mouse            disable mouse support
@@ -32,11 +32,13 @@ import signal
 import sys
 import threading
 import traceback
+from collections import OrderedDict
 from configparser import ConfigParser
 from ctypes import *
 from itertools import takewhile
 from pprint import pprint
 from select import select
+from shutil import get_terminal_size
 from textwrap import dedent
 from time import sleep
 
@@ -863,7 +865,7 @@ class PulseSinkInfo(PulseSink):
             self.active_port = PulsePort(pa_sink_info.active_port.contents)
 
     def __str__(self):
-        return "ID: {}, Name: {}, Mute: {}, {}".format(self.index, self.description.decode(), self.mute, self.volume)
+        return "ID: sink-{}, Name: {}, Mute: {}, {}".format(self.index, self.description.decode(), self.mute, self.volume)
 
 
 class PulseSinkInputInfo(PulseSink):
@@ -879,8 +881,8 @@ class PulseSinkInputInfo(PulseSink):
 
     def __str__(self):
         if self.client:
-            return "ID: {}, Name: {}, Mute: {}, {}".format(self.index, self.client.name.decode(), self.mute, self.volume)
-        return "ID: {}, Name: {}, Mute: {}".format(self.index, self.name.decode(), self.mute)
+            return "ID: sink-input-{}, Name: {}, Mute: {}, {}".format(self.index, self.client.name.decode(), self.mute, self.volume)
+        return "ID: sink-input-{}, Name: {}, Mute: {}".format(self.index, self.name.decode(), self.mute)
 
 
 class PulseSource(DebugMixin):
@@ -908,7 +910,7 @@ class PulseSourceInfo(PulseSource):
             self.active_port = PulsePort(pa_source_info.active_port.contents)
 
     def __str__(self):
-        return "ID: {}, Name: {}, Mute: {}, {}".format(self.index, self.description.decode(), self.mute, self.volume)
+        return "ID: source-{}, Name: {}, Mute: {}, {}".format(self.index, self.description.decode(), self.mute, self.volume)
 
 
 class PulseSourceOutputInfo(PulseSource):
@@ -923,8 +925,8 @@ class PulseSourceOutputInfo(PulseSource):
 
     def __str__(self):
         if self.client:
-            return "ID: {}, Name: {}, Mute: {}, {}".format(self.index, self.client.name.decode(), self.mute, self.volume)
-        return "ID: {}, Name: {}, Mute: {}".format(self.index, self.name.decode(), self.mute)
+            return "ID: source-output-{}, Name: {}, Mute: {}, {}".format(self.index, self.client.name.decode(), self.mute, self.volume)
+        return "ID: source-output-{}, Name: {}, Mute: {}".format(self.index, self.name.decode(), self.mute)
 
 
 class PulseVolume(DebugMixin):
@@ -1215,8 +1217,7 @@ class Screen():
             return None
 
     def resize(self):
-        size = os.get_terminal_size()
-        curses.LINES, curses.COLS = size.lines, size.columns
+        curses.COLS, curses.LINES = get_terminal_size()
         curses.resizeterm(curses.LINES, curses.COLS)
         self.submenu.resize(curses.LINES, self.submenu_width + 1)
         if self.submenu_show:
@@ -1927,65 +1928,65 @@ def main():
     noninteractive_opts.pop('--color', None)
     noninteractive_opts.pop('--no-mouse', None)
     if not noninteractive_opts:
-        if sys.stdout.isatty():
-            title = 'pulsemixer {}'.format(CFG.general.server.decode() if CFG.general.server else '')
-            print('\033]2;{}\007'.format(title.strip()), end='', flush=True)
-            curses.wrapper(Screen(CFG.ui.color, CFG.ui.mouse).run)
-        else:
-            sys.exit('ERR: output is not a tty-like device')
+        if not sys.stdout.isatty(): sys.exit('ERR: output is not a tty-like device')
+        title = 'pulsemixer {}'.format(CFG.general.server.decode() if CFG.general.server else '')
+        print('\033]2;{}\007'.format(title.strip()), end='', flush=True)
+        curses.wrapper(Screen(CFG.ui.color, CFG.ui.mouse).run)
 
     sinks = PULSE.sink_list()
     sink_inputs = PULSE.sink_input_list()
     sources = PULSE.source_list()
     source_outputs = PULSE.source_output_list()
     server_info = PULSE.get_server_info()
+    streams = OrderedDict()
+    for k, v in (('sink-', sinks), ('sink-input-', sink_inputs), ('source-', sources), ('source-output-', source_outputs)):
+        for stream in v: streams[k + str(stream.index)] = stream
 
     check_n = lambda x, err: x.strip('+-').isdigit() or sys.exit('ERR: {} must be a number'.format(err))
+    check_id = lambda x: x in streams or sys.exit('ERR: No such ID: ' + str(x))
+    from_old_id = lambda index: next((k for k in streams if k.rsplit('-', 1)[-1] == index), index)
+    print_default = lambda x, y: print(x == y and ', Default' or '')
+
     if '--id' in dopts:
         index = [i for i in opts if '--id' in i][0][1]
-        index = check_n(index, err='ID') and int(index)
+        if index.isdigit(): index = from_old_id(index)
     else:
-        index = [s.index for s in sinks if s.name == server_info.default_sink_name][0]
-    streams = {}
-    for i in source_outputs + sources + sink_inputs + sinks:
-        streams[i.index] = i
-    check_id = lambda x: x in streams or sys.exit('ERR: No such ID: ' + str(x))
+        index = 'sink-{}'.format([s.index for s in sinks if s.name == server_info.default_sink_name][0])
     check_id(index)
-    print_default = lambda x, y: print(x == y and ', Default' or '')
     max_volume = 150
 
     for opt, arg in opts:
         if opt == '--id':
-            check_n(arg, err='ID')
-            index = int(arg)
+            index = arg
+            if index.isdigit(): index = from_old_id(index)
             check_id(index)
             max_volume = 150  # reset for each new id
 
         elif opt in ('-l', '--list'):
-            for sink in sink_inputs:
-                print("Sink input:\t", sink)
-            for source in source_outputs:
-                print("Source output:\t", source)
             for sink in sinks:
                 print("Sink:\t\t", sink, end='')
                 print_default(sink.name, server_info.default_sink_name)
+            for sink in sink_inputs:
+                print("Sink input:\t", sink)
             for source in sources:
                 print("Source:\t\t", source, end='')
                 print_default(source.name, server_info.default_source_name)
+            for source in source_outputs:
+                print("Source output:\t", source)
 
         elif opt == '--list-sinks':
-            for sink in sink_inputs:
-                print("Sink input:\t", sink)
             for sink in sinks:
                 print("Sink:\t\t", sink, end='')
                 print_default(sink.name, server_info.default_sink_name)
+            for sink in sink_inputs:
+                print("Sink input:\t", sink)
 
         elif opt == '--list-sources':
-            for source in source_outputs:
-                print("Source output:\t", source)
             for source in sources:
                 print("Source:\t\t", source, end='')
                 print_default(source.name, server_info.default_source_name)
+            for source in source_outputs:
+                print("Source output:\t", source)
 
         elif opt == '--get-mute':
             print(streams[index].mute)
