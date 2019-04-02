@@ -255,7 +255,6 @@ class PA_SERVER_INFO(Structure):
 
 
 PA_STATE_CB_T              = CFUNCTYPE(c_int, POINTER(PA_CONTEXT), c_void_p)
-PA_SIGNAL_CB_T             = CFUNCTYPE(c_void_p, POINTER(PA_MAINLOOP_API), POINTER(c_int), c_int, c_void_p)
 PA_CLIENT_INFO_CB_T        = CFUNCTYPE(c_void_p, POINTER(PA_CONTEXT), POINTER(PA_CLIENT_INFO), c_int, c_void_p)
 PA_SINK_INPUT_INFO_CB_T    = CFUNCTYPE(c_int, POINTER(PA_CONTEXT), POINTER(PA_SINK_INPUT_INFO), c_int, c_void_p)
 PA_SINK_INFO_CB_T          = CFUNCTYPE(c_int, POINTER(PA_CONTEXT), POINTER(PA_SINK_INFO), c_int, c_void_p)
@@ -301,14 +300,6 @@ pa_threaded_mainloop_signal.argtypes = [POINTER(PA_THREADED_MAINLOOP), c_int]
 pa_threaded_mainloop_get_api = DLL.pa_threaded_mainloop_get_api
 pa_threaded_mainloop_get_api.restype = POINTER(PA_MAINLOOP_API)
 pa_threaded_mainloop_get_api.argtypes = [POINTER(PA_THREADED_MAINLOOP)]
-
-pa_signal_init = DLL.pa_signal_init
-pa_signal_init.restype = c_int
-pa_signal_init.argtypes = [POINTER(PA_MAINLOOP_API)]
-
-pa_signal_new = DLL.pa_signal_new
-pa_signal_new.restype = None
-pa_signal_new.argtypes = [c_int, PA_SIGNAL_CB_T, POINTER(c_void_p)]
 
 pa_context_errno = DLL.pa_context_errno
 pa_context_errno.restype = c_int
@@ -549,7 +540,6 @@ class Pulse(DebugMixin):
         self.client_name = client_name.encode()
         self.server_name = server_name
 
-        self.pa_signal_cb = PA_SIGNAL_CB_T(self.signal_cb)
         self.pa_state_cb = PA_STATE_CB_T(self.state_cb)
         self.pa_subscribe_cb = self.pa_dc_cb = lambda: None
         self.pa_cbs = {'sink_input_info':    PA_SINK_INPUT_INFO_CB_T(self.sink_input_cb),
@@ -567,18 +557,16 @@ class Pulse(DebugMixin):
         self.context = pa_context_new(self.mainloop_api, self.client_name)
         pa_context_set_state_callback(self.context, self.pa_state_cb, None)
 
-        if not reconnect: assert pa_signal_init(self.mainloop_api) == 0, "pa_signal_init failed"
-        pa_signal_new(2, self.pa_signal_cb, None)
-        pa_signal_new(15, self.pa_signal_cb, None)
-        if pa_context_connect(self.context, self.server_name, 0, None) < 0:
-            self.disconnect()
+        if pa_context_connect(self.context, self.server_name, 0, None) < 0 or self.error:
             if not reconnect: sys.exit("Failed to connect to pulseaudio: Connection refused")
             else: return
 
         pa_threaded_mainloop_lock(self.mainloop)
         pa_threaded_mainloop_start(self.mainloop)
+        if self.error and reconnect: return
         pa_threaded_mainloop_wait(self.mainloop) or pa_threaded_mainloop_unlock(self.mainloop)
-        if self.error: sys.exit('Failed to connect to pulseaudio')
+        if self.error and reconnect: return
+        elif self.error: sys.exit('Failed to connect to pulseaudio')
         self.connected = True
 
     def wait_and_unlock(self):
@@ -587,6 +575,12 @@ class Pulse(DebugMixin):
         pa_operation_unref(self.operation)
 
     def reconnect(self):
+        if self.context:
+            pa_context_disconnect(self.context)
+            pa_context_unref(self.context)
+        if self.mainloop:
+            pa_threaded_mainloop_stop(self.mainloop)
+            pa_threaded_mainloop_free(self.mainloop)
         self.__init__(self.client_name.decode(), self.server_name, reconnect=True)
 
     def unmute_stream(self, obj):
@@ -641,19 +635,14 @@ class Pulse(DebugMixin):
                     break
         return data
 
-    def signal_cb(self, api, e, sig, userdata):
-        if sig in (2, 15):
-            self.disconnect()
-
     def state_cb(self, c, b):
         state = pa_context_get_state(c)
         if state == PA_CONTEXT_READY:
             pa_threaded_mainloop_signal(self.mainloop, 0)
         elif state == PA_CONTEXT_FAILED:
             self.error = RuntimeError("Failed to complete action: {}, {}".format(state, pa_context_errno(c)))
-            if not self.connected:   # failed to __init__, can happen with invalid server_name
-                pa_threaded_mainloop_signal(self.mainloop, 0)
             self.connected = False
+            pa_threaded_mainloop_signal(self.mainloop, 0)
             self.pa_dc_cb()
         return 0
 
@@ -710,13 +699,6 @@ class Pulse(DebugMixin):
 
     def context_success(self, *_):
         pa_threaded_mainloop_signal(self.mainloop, 0)
-
-    def disconnect(self):
-        self.connected = False
-        pa_context_disconnect(self.context)
-        pa_context_unref(self.context)
-        pa_threaded_mainloop_stop(self.mainloop)
-        pa_threaded_mainloop_free(self.mainloop)
 
     def subscribe(self, cb):
         self.pa_subscribe_cb, self.pa_dc_cb = PA_CONTEXT_SUBSCRIBE_CB_T(cb), cb
@@ -1233,7 +1215,7 @@ class Screen():
         self.lines, self.cols = curses.LINES - 2, curses.COLS - 1
         self.ev.set()
 
-    def termiate(self):
+    def terminate(self):
         # if ^C pressed while sleeping in reconnect wrapper.restore won't be called
         # so have to restore it manually here
         self.screen.keypad(0)
@@ -1248,15 +1230,15 @@ class Screen():
         self.data = [(Bar('PA - Connection refused.\nTrying to reconnect.'), Bar.NONE, 0)]
         while not PULSE.connected:
             self.display()
-            if self.screen.getch() in CFG.keys.quit:
-                sys.exit()
+            if self.screen.getch() in CFG.keys.quit: sys.exit()
             PULSE.reconnect()
-            sleep(0.2)
+            sleep(0.5)
         PULSE.subscribe(self.wake_cb)
         self.ev.set()
 
     def run(self, _):
-        signal.signal(signal.SIGINT, lambda s, f: self.termiate())
+        signal.signal(signal.SIGINT, lambda s, f: self.terminate())
+        signal.signal(signal.SIGTERM, lambda s, f: self.terminate())
         signal.signal(signal.SIGWINCH, lambda s, f: self.resize())
         threading.Thread(target=self.pregetcher, daemon=True).start()
         PULSE.subscribe(self.wake_cb)
@@ -1921,6 +1903,7 @@ def main():
         CFG.ui.color = min(2, max(0, int(dopts.get('--color', '') or CFG.ui.color)))
     except:
         sys.exit('ERR: color must be a number')
+    signal.signal(signal.SIGINT, lambda s, f: sys.exit(1))
     PULSE = Pulse('pulsemixer', CFG.general.server)
 
     noninteractive_opts = dict(dopts)
