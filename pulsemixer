@@ -1836,6 +1836,13 @@ class Config():
         ; info-unlocked      = U
         ; info-muted         = M  ; 🔇
         ; info-unmuted       = M  ; 🔉
+
+        ;[renames]
+        ;renames: {
+        ;    'default name example': 'new name',
+        ;    'AudioIPC Server': 'FireFox',
+        ;    }
+
         '''
         directory = self.path.rsplit('/', 1)[0]
         if not os.path.exists(directory):
