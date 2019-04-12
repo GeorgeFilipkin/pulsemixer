@@ -41,6 +41,7 @@ from select import select
 from shutil import get_terminal_size
 from textwrap import dedent
 from time import sleep
+from ast import literal_eval
 
 #########################################################################################
 # v bindings
@@ -1537,7 +1538,11 @@ class Screen():
             if bartype is Bar.LEFT:
                 if bar.pa.name in (self.server_info.default_sink_name, self.server_info.default_source_name):
                     tree = CFG.style.default_stream
-                name = '{}{}'.format(bar.name, bar.media_name)
+                barname = bar.name
+                for key in CFG.renames:
+                    if key == barname:
+                        barname = CFG.renames[key]
+                name = '{}{}'.format(barname, bar.media_name)
                 name = name[:20 + off] + '~' if len(name) > 20 + off else name
                 line = '{:<{}}|{}\n {:<3}|{}\n '.format(name, 22 + off, focus_hl,
                                                         '' if type(bar.pa) is PulseCard else bar.volume[0],
@@ -1782,7 +1787,7 @@ class Config():
         [general]
         step = 1
         step-big = 10
-        ; server = 
+        ; server =
 
         [keys]
         ;; To bind "special keys" such as arrows see "Key constant" table in
@@ -1842,6 +1847,9 @@ class Config():
     def load(self):
         parser = ConfigParser(inline_comment_prefixes=('#', ';'))
         if not parser.read(self.path): return
+        if parser.has_section('renames'):
+            self.renames = literal_eval(parser['renames']['renames'])
+            parser.remove_section('renames')
         def getkeys(s, k):
             keys = []
             for i in parser.get(s, k).strip(',').split(','):
