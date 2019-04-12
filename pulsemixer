@@ -1771,6 +1771,7 @@ class Config():
         self.keys = Keys()
         self.ui = UI()
         self.style = Style()
+        self.renames = {}
 
         self.path = os.getenv("XDG_CONFIG_HOME", os.path.join(os.path.expanduser("~"), ".config")) + '/pulsemixer.cfg'
         try:
