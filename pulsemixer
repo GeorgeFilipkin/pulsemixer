@@ -947,6 +947,10 @@ class Bar():
         else:
             self.fullname = pa.client.name.decode()
         self.name = re.sub(r'^ALSA plug-in \[|\]$', '', self.fullname.replace('|', ' '))
+        for key in CFG.renames:
+            if key.match(self.name):
+                self.name = CFG.renames[key]
+                break
         self.index = pa.index
         self.owner = -1
         self.stream_index = -1
@@ -1537,8 +1541,7 @@ class Screen():
             if bartype is Bar.LEFT:
                 if bar.pa.name in (self.server_info.default_sink_name, self.server_info.default_source_name):
                     tree = CFG.style.default_stream
-                barname = CFG.renames.get(bar.name, bar.name)
-                name = '{}{}'.format(barname, bar.media_name)
+                name = '{}{}'.format(bar.name, bar.media_name)
                 name = name[:20 + off] + '~' if len(name) > 20 + off else name
                 line = '{:<{}}|{}\n {:<3}|{}\n '.format(name, 22 + off, focus_hl,
                                                         '' if type(bar.pa) is PulseCard else bar.volume[0],
@@ -1850,7 +1853,7 @@ class Config():
         parser.optionxform = str  # keep case of keys, lowered() later
         if not parser.read(self.path): return
         if parser.has_section('renames'):
-            self.renames = {k.strip('"\''):v.strip('"\'') for k, v in parser.items('renames')}
+            self.renames = {re.compile(k.strip('"\'') + r'\Z'):v.strip('"\'') for k, v in parser.items('renames')}
             parser.remove_section('renames')
         def getkeys(s, k):
             keys = []
