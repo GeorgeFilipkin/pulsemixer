@@ -947,6 +947,10 @@ class Bar():
         else:
             self.fullname = pa.client.name.decode()
         self.name = re.sub(r'^ALSA plug-in \[|\]$', '', self.fullname.replace('|', ' '))
+        for key in CFG.renames:
+            if key.match(self.name):
+                self.name = CFG.renames[key]
+                break
         self.index = pa.index
         self.owner = -1
         self.stream_index = -1
@@ -961,11 +965,11 @@ class Bar():
         self.owned = owned
         self.stream_index = stream_index
         self.volume = pa.volume.values
-        try:
+        if hasattr(pa, 'media_name'):
             media_name = pa.media_name.decode().replace('|', ' ')
-            if self.name != media_name:
+            if self.fullname != media_name:
                 self.media_name = ': {}'.format(media_name)
-        except:
+        else:
             self.media_name = ''
         if type(pa) in (PulseSinkInputInfo, PulseSourceOutputInfo):
             self.owner = pa.owner
@@ -1169,9 +1173,9 @@ class Screen():
             return
         side = 'All' if bar.locked else 'Mono' if bar.channels == 1 else self.SIDES[side]
         more = '↕' if bottom < self.n_lines and self.top_line_num > 0 else '↑' if self.top_line_num > 0 else '↓' if bottom < self.n_lines else ' '
-        name = '{}: {}'.format(bar.fullname, side)
+        name = '{}: {}'.format(bar.name, side)
         if len(name) > self.cols - 8:
-            name = '{}: {}'.format(bar.fullname[:self.cols - (10 + len(side))].strip(), side)
+            name = '{}: {}'.format(bar.name[:self.cols - (10 + len(side))].strip(), side)
         locked = '{}|{}'.format(CFG.style.info_locked, self.red) if bar.locked else '{}|{}'.format(CFG.style.info_unlocked, curses.A_DIM)
         muted  = '{}|{}'.format(CFG.style.info_muted, self.red) if bar.muted else '{}|{}'.format(CFG.style.info_unmuted, curses.A_DIM)
         self.info = '{}\n {}\n  {}|{}\n{:>{}}|0'.format(locked, muted, name, curses.A_NORMAL, more, self.cols - len(name) - 5)
@@ -1766,6 +1770,7 @@ class Config():
         self.keys = Keys()
         self.ui = UI()
         self.style = Style()
+        self.renames = {}
 
         self.path = os.getenv("XDG_CONFIG_HOME", os.path.join(os.path.expanduser("~"), ".config")) + '/pulsemixer.cfg'
         try:
@@ -1782,7 +1787,7 @@ class Config():
         [general]
         step = 1
         step-big = 10
-        ; server = 
+        ; server =
 
         [keys]
         ;; To bind "special keys" such as arrows see "Key constant" table in
@@ -1831,6 +1836,13 @@ class Config():
         ; info-unlocked      = U
         ; info-muted         = M  ; 🔇
         ; info-unmuted       = M  ; 🔉
+
+        [renames]
+        ;; Changes stream names in interactive mode, regular expression are supported
+        ;; https://docs.python.org/3/library/re.html#regular-expression-syntax
+        ; 'default name example' = 'new name'
+        ; '(?i)built-in .* audio' = 'Audio Controller'
+        ; 'AudioIPC Server' = 'Firefox'
         '''
         directory = self.path.rsplit('/', 1)[0]
         if not os.path.exists(directory):
@@ -1841,7 +1853,11 @@ class Config():
 
     def load(self):
         parser = ConfigParser(inline_comment_prefixes=('#', ';'))
+        parser.optionxform = str  # keep case of keys, lowered() later
         if not parser.read(self.path): return
+        if parser.has_section('renames'):
+            self.renames = {re.compile(k.strip('"\'') + r'\Z'):v.strip('"\'') for k, v in parser.items('renames')}
+            parser.remove_section('renames')
         def getkeys(s, k):
             keys = []
             for i in parser.get(s, k).strip(',').split(','):
@@ -1863,7 +1879,7 @@ class Config():
                int: parser.getint, float: parser.getfloat}
         for section in parser.sections():
             for key in parser[section]:
-                pykey = key.replace('-', '_')
+                pykey = key.lower().replace('-', '_')
                 pyval = getattr(getattr(self, section.lower()), pykey)
                 val = get[type(pyval)](section, key)
                 setattr(getattr(self, section.lower()), pykey, val)
