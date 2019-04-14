@@ -965,11 +965,11 @@ class Bar():
         self.owned = owned
         self.stream_index = stream_index
         self.volume = pa.volume.values
-        try:
+        if hasattr(pa, 'media_name'):
             media_name = pa.media_name.decode().replace('|', ' ')
-            if self.name != media_name:
+            if self.fullname != media_name:
                 self.media_name = ': {}'.format(media_name)
-        except:
+        else:
             self.media_name = ''
         if type(pa) in (PulseSinkInputInfo, PulseSourceOutputInfo):
             self.owner = pa.owner
@@ -1173,9 +1173,9 @@ class Screen():
             return
         side = 'All' if bar.locked else 'Mono' if bar.channels == 1 else self.SIDES[side]
         more = '↕' if bottom < self.n_lines and self.top_line_num > 0 else '↑' if self.top_line_num > 0 else '↓' if bottom < self.n_lines else ' '
-        name = '{}: {}'.format(bar.fullname, side)
+        name = '{}: {}'.format(bar.name, side)
         if len(name) > self.cols - 8:
-            name = '{}: {}'.format(bar.fullname[:self.cols - (10 + len(side))].strip(), side)
+            name = '{}: {}'.format(bar.name[:self.cols - (10 + len(side))].strip(), side)
         locked = '{}|{}'.format(CFG.style.info_locked, self.red) if bar.locked else '{}|{}'.format(CFG.style.info_unlocked, curses.A_DIM)
         muted  = '{}|{}'.format(CFG.style.info_muted, self.red) if bar.muted else '{}|{}'.format(CFG.style.info_unmuted, curses.A_DIM)
         self.info = '{}\n {}\n  {}|{}\n{:>{}}|0'.format(locked, muted, name, curses.A_NORMAL, more, self.cols - len(name) - 5)
