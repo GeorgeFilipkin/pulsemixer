@@ -173,6 +173,13 @@ step-big = 10
 ; info-unlocked      = U
 ; info-muted         = M  ; 🔇
 ; info-unmuted       = M  ; 🔉
+
+[renames]
+;; Changes stream names in interactive mode, regular expression are supported
+;; https://docs.python.org/3/library/re.html#regular-expression-syntax
+; 'default name example' = 'new name'
+; '(?i)built-in .* audio' = 'Audio Controller'
+; 'AudioIPC Server' = 'Firefox'
 ```
 
 The old environment variable `PULSEMIXER_BAR_STYLE` is still supported.  

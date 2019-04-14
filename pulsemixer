@@ -1838,7 +1838,10 @@ class Config():
         ; info-unmuted       = M  ; 🔉
 
         [renames]
+        ;; Changes stream names in interactive mode, regular expression are supported
+        ;; https://docs.python.org/3/library/re.html#regular-expression-syntax
         ; 'default name example' = 'new name'
+        ; '(?i)built-in .* audio' = 'Audio Controller'
         ; 'AudioIPC Server' = 'Firefox'
         '''
         directory = self.path.rsplit('/', 1)[0]
