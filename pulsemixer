@@ -1671,12 +1671,14 @@ class Screen():
                 return
             else:
                 index = self.selected[0].pa.index
+                description = self.action.rsplit('|')[0].strip()
+                get_name = lambda desc, l: next(filter(lambda x: x.description.decode() == desc, l)).name
                 if type(self.selected[0].pa) is PulseSinkInfo:
-                    PULSE.set_sink_port(index, self.selected[0].pa.ports[focus].name)
+                    PULSE.set_sink_port(index, get_name(description, self.selected[0].pa.ports))
                 elif type(self.selected[0].pa) is PulseSourceInfo:
-                    PULSE.set_source_port(index, self.selected[0].pa.ports[focus].name)
+                    PULSE.set_source_port(index, get_name(description, self.selected[0].pa.ports))
                 elif type(self.selected[0].pa) is PulseCard:
-                    PULSE.set_card_profile(index, self.selected[0].pa.profiles[focus].name)
+                    PULSE.set_card_profile(index, get_name(description, self.selected[0].pa.profiles))
             self.change_mode_allowed = True
             self.submenu_show = False
             self.focus_line_num = self.modes_data[5][1]
