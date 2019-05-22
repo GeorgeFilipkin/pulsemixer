@@ -41,6 +41,7 @@ from select import select
 from shutil import get_terminal_size
 from textwrap import dedent
 from time import sleep
+from unicodedata import east_asian_width
 
 #########################################################################################
 # v bindings
@@ -954,7 +955,7 @@ class Bar():
         self.index = pa.index
         self.owner = -1
         self.stream_index = -1
-        self.media_name = ''
+        self.media_name, self.media_name_wide, self.media_name_widths = '', False, []
         self.poll_data(pa, 0, 0)
         self.maxsize = 150
         self.locked = True
@@ -966,11 +967,15 @@ class Bar():
         self.stream_index = stream_index
         self.volume = pa.volume.values
         if hasattr(pa, 'media_name'):
-            media_name = pa.media_name.decode().replace('|', ' ')
-            if self.fullname != media_name:
-                self.media_name = ': {}'.format(media_name)
+            media_fullname = pa.media_name.decode()
+            media_name = ': {}'.format(media_fullname.replace('|', ' '))
+            if media_fullname != self.fullname and media_name != self.media_name:
+                self.media_name, self.media_name_wide = media_name, False
+                if len(media_name) != len(pa.media_name) + 2:  # contains multi-byte chars which might be wide
+                    self.media_name_widths = [int(east_asian_width(c) == 'W') + 1 for c in media_name]
+                    self.media_name_wide = 2 in self.media_name_widths
         else:
-            self.media_name = ''
+            self.media_name, self.media_name_wide = '', False
         if type(pa) in (PulseSinkInputInfo, PulseSourceOutputInfo):
             self.owner = pa.owner
         self.pa = pa
@@ -1542,7 +1547,14 @@ class Screen():
                 if bar.pa.name in (self.server_info.default_sink_name, self.server_info.default_source_name):
                     tree = CFG.style.default_stream
                 name = '{}{}'.format(bar.name, bar.media_name)
-                name = name[:20 + off] + '~' if len(name) > 20 + off else name
+                if bar.media_name_wide and len(bar.name) + sum(bar.media_name_widths) > 20 + off:
+                    to_remove, widths = 0, [1] * len(bar.name) + bar.media_name_widths
+                    while sum(widths) > 20 + off:
+                        widths.pop()
+                        to_remove += 1
+                    name = name[:-to_remove].strip() + '~'
+                elif len(name) > 20 + off:
+                    name = name[:20 + off].strip() + '~'
                 line = '{:<{}}|{}\n {:<3}|{}\n '.format(name, 22 + off, focus_hl,
                                                         '' if type(bar.pa) is PulseCard else bar.volume[0],
                                                         focus_hl)
