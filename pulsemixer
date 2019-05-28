@@ -1755,9 +1755,6 @@ class Config():
         class UI:
             hide_unavailable_profiles = False
             hide_unavailable_ports = False
-            # hide_live = False
-            # blip_timeout = 5
-            # cycle = False
             color = 2
             mouse = True
 
@@ -1785,12 +1782,7 @@ class Config():
         self.ui = UI()
         self.style = Style()
         self.renames = {}
-
         self.path = os.getenv("XDG_CONFIG_HOME", os.path.join(os.path.expanduser("~"), ".config")) + '/pulsemixer.cfg'
-        try:
-            self.load()
-        except Exception as e:
-            sys.exit('ERR: {}'.format(e))
 
     def save(self):
         default = '''
@@ -1832,8 +1824,6 @@ class Config():
         [style]
         ;; Pulsemixer will use these characters to draw interface
         ;; Single characters only
-        ;; Keep in mind that vte-based terminals might have problems displaying wide unicode symbols
-        ;;      https://bugzilla.gnome.org/show_bug.cgi?id=772890
         ; bar-top-left       = ┌
         ; bar-left-mono      = ╶
         ; bar-top-right      = ┐
@@ -1868,7 +1858,7 @@ class Config():
     def load(self):
         parser = ConfigParser(inline_comment_prefixes=('#', ';'))
         parser.optionxform = str  # keep case of keys, lowered() later
-        if not parser.read(self.path): return
+        if not parser.read(self.path): return self
         if parser.has_section('renames'):
             self.renames = {re.compile(k.strip('"\'') + r'\Z'):v.strip('"\'') for k, v in parser.items('renames')}
             parser.remove_section('renames')
@@ -1897,6 +1887,7 @@ class Config():
                 pyval = getattr(getattr(self, section.lower()), pykey)
                 val = get[type(pyval)](section, key)
                 setattr(getattr(self, section.lower()), pykey, val)
+        return self
 
 
 PULSE = CFG = None
@@ -1926,7 +1917,10 @@ def main():
             sys.exit('ERR: {}'.format(e))
 
     global PULSE, CFG
-    CFG = Config()
+    try:
+        CFG = Config().load()
+    except Exception as e:
+        sys.exit('ERR: {}'.format(e))
     CFG.general.server = dopts.get('--server', '').encode() or CFG.general.server
     CFG.ui.mouse = False if '--no-mouse' in dopts else CFG.ui.mouse
     try:
