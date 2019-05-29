@@ -59,24 +59,8 @@ PA_CONTEXT_FAILED = 5
 PA_SUBSCRIPTION_MASK_ALL = 0x02ff
 
 
-class PA_THREADED_MAINLOOP(Structure):
-    pass
-
-
-class PA_MAINLOOP_API(Structure):
-    pass
-
-
-class PA_CONTEXT(Structure):
-    pass
-
-
-class PA_OPERATION(Structure):
-    pass
-
-
-class PA_PROPLIST(Structure):
-    pass
+class Struct(Structure): pass
+PA_PROPLIST = PA_OPERATION = PA_CONTEXT = PA_THREADED_MAINLOOP = PA_MAINLOOP_API = Struct
 
 
 class PA_SAMPLE_SPEC(Structure):
@@ -306,9 +290,9 @@ pa_context_errno = DLL.pa_context_errno
 pa_context_errno.restype = c_int
 pa_context_errno.argtypes = [POINTER(PA_CONTEXT)]
 
-pa_context_new = DLL.pa_context_new
-pa_context_new.restype = POINTER(PA_CONTEXT)
-pa_context_new.argtypes = [POINTER(PA_MAINLOOP_API), c_char_p]
+pa_context_new_with_proplist = DLL.pa_context_new_with_proplist
+pa_context_new_with_proplist.restype = POINTER(PA_CONTEXT)
+pa_context_new_with_proplist.argtypes = [POINTER(PA_MAINLOOP_API), c_char_p, POINTER(PA_PROPLIST)]
 
 pa_context_unref = DLL.pa_context_unref
 pa_context_unref.restype = None
@@ -342,9 +326,18 @@ pa_context_set_subscribe_callback = DLL.pa_context_set_subscribe_callback
 pa_context_set_subscribe_callback.restype = None
 pa_context_set_subscribe_callback.args = [POINTER(PA_CONTEXT), PA_CONTEXT_SUBSCRIBE_CB_T, c_void_p]
 
+pa_proplist_new = DLL.pa_proplist_new
+pa_proplist_new.restype = POINTER(PA_PROPLIST)
+
+pa_proplist_sets = DLL.pa_proplist_sets
+pa_proplist_sets.argtypes = [POINTER(PA_PROPLIST), c_char_p, c_char_p]
+
 pa_proplist_gets = DLL.pa_proplist_gets
 pa_proplist_gets.restype = c_char_p
 pa_proplist_gets.argtypes = [POINTER(PA_PROPLIST), c_char_p]
+
+pa_proplist_free = DLL.pa_proplist_free
+pa_proplist_free.argtypes = [POINTER(PA_PROPLIST)]
 
 pa_context_get_sink_input_info_list = DLL.pa_context_get_sink_input_info_list
 pa_context_get_sink_input_info_list.restype = POINTER(PA_OPERATION)
@@ -543,20 +536,23 @@ class Pulse(DebugMixin):
 
         self.pa_state_cb = PA_STATE_CB_T(self.state_cb)
         self.pa_subscribe_cb = self.pa_dc_cb = lambda: None
-        self.pa_cbs = {'sink_input_info':    PA_SINK_INPUT_INFO_CB_T(self.sink_input_cb),
-                       'source_output_info': PA_SOURCE_OUTPUT_INFO_CB_T(self.source_output_cb),
-                       'sink_info':          PA_SINK_INFO_CB_T(self.sink_cb),
-                       'source_info':        PA_SOURCE_INFO_CB_T(self.source_cb),
-                       'server_info':        PA_SERVER_INFO_CB_T(self.server_cb),
-                       'card_info':          PA_CARD_INFO_CB_T(self.card_cb),
-                       'client_info':        PA_CLIENT_INFO_CB_T(self.client_cb),
+        self.pa_cbs = {'sink_input_list':    PA_SINK_INPUT_INFO_CB_T(self.sink_input_list_cb),
+                       'source_output_list': PA_SOURCE_OUTPUT_INFO_CB_T(self.source_output_list_cb),
+                       'sink_list':          PA_SINK_INFO_CB_T(self.sink_list_cb),
+                       'source_list':        PA_SOURCE_INFO_CB_T(self.source_list_cb),
+                       'server':             PA_SERVER_INFO_CB_T(self.server_cb),
+                       'card_list':          PA_CARD_INFO_CB_T(self.card_list_cb),
+                       'client_list':        PA_CLIENT_INFO_CB_T(self.client_list_cb),
                        'success':            PA_CONTEXT_SUCCESS_CB_T(self.context_success)}
-
         self.mainloop = pa_threaded_mainloop_new()
         self.mainloop_api = pa_threaded_mainloop_get_api(self.mainloop)
 
-        self.context = pa_context_new(self.mainloop_api, self.client_name)
+        proplist = pa_proplist_new()
+        pa_proplist_sets(proplist, b'application.id', self.client_name)
+        pa_proplist_sets(proplist, b'application.icon_name', b'audio-card')
+        self.context = pa_context_new_with_proplist(self.mainloop_api, self.client_name, proplist)
         pa_context_set_state_callback(self.context, self.pa_state_cb, None)
+        pa_proplist_free(proplist)
 
         if pa_context_connect(self.context, self.server_name, 0, None) < 0 or self.error:
             if not reconnect: sys.exit("Failed to connect to pulseaudio: Connection refused")
@@ -666,32 +662,34 @@ class Pulse(DebugMixin):
                 pa_threaded_mainloop_unlock(self.mainloop)
                 raise e
             self.wait_and_unlock()
+            if func.__name__ in ('sink_input_list', 'source_output_list'):
+                self.data = self.fill_clients()
             data, self.data = self.data, []
             return data or []
         return wrapper
 
     @_eof_cb
-    def card_cb(self, c, card_info, eof, userdata):
+    def card_list_cb(self, c, card_info, eof, userdata):
         self.data.append(PulseCard(card_info[0]))
 
     @_eof_cb
-    def client_cb(self, c, client_info, eof, userdata):
+    def client_list_cb(self, c, client_info, eof, userdata):
         self.data.append(PulseClient(client_info[0]))
 
     @_eof_cb
-    def sink_input_cb(self, c, sink_input_info, eof, userdata):
+    def sink_input_list_cb(self, c, sink_input_info, eof, userdata):
         self.data.append(PulseSinkInputInfo(sink_input_info[0]))
 
     @_eof_cb
-    def sink_cb(self, c, sink_info, eof, userdata):
+    def sink_list_cb(self, c, sink_info, eof, userdata):
         self.data.append(PulseSinkInfo(sink_info[0]))
 
     @_eof_cb
-    def source_output_cb(self, c, source_output_info, eof, userdata):
+    def source_output_list_cb(self, c, source_output_info, eof, userdata):
         self.data.append(PulseSourceOutputInfo(source_output_info[0]))
 
     @_eof_cb
-    def source_cb(self, c, source_info, eof, userdata):
+    def source_list_cb(self, c, source_info, eof, userdata):
         self.data.append(PulseSourceInfo(source_info[0]))
 
     def server_cb(self, c, server_info, userdata):
@@ -708,39 +706,33 @@ class Pulse(DebugMixin):
         self.operation = pa_context_subscribe(self.context, PA_SUBSCRIPTION_MASK_ALL, self.pa_cbs['success'], None)
         self.wait_and_unlock()
 
+    @_action_sync
     def sink_input_list(self):
-        pa_threaded_mainloop_lock(self.mainloop)
-        self.operation = pa_context_get_sink_input_info_list(self.context, self.pa_cbs['sink_input_info'], None)
-        self.wait_and_unlock()
-        data, self.data = self.fill_clients(), []
-        return data or []
+        self.operation = pa_context_get_sink_input_info_list(self.context, self.pa_cbs['sink_input_list'], None)
 
+    @_action_sync
     def source_output_list(self):
-        pa_threaded_mainloop_lock(self.mainloop)
-        self.operation = pa_context_get_source_output_info_list(self.context, self.pa_cbs['source_output_info'], None)
-        self.wait_and_unlock()
-        data, self.data = self.fill_clients(), []
-        return data or []
+        self.operation = pa_context_get_source_output_info_list(self.context, self.pa_cbs['source_output_list'], None)
 
     @_action_sync
     def sink_list(self):
-        self.operation = pa_context_get_sink_info_list(self.context, self.pa_cbs['sink_info'], None)
+        self.operation = pa_context_get_sink_info_list(self.context, self.pa_cbs['sink_list'], None)
 
     @_action_sync
     def source_list(self):
-        self.operation = pa_context_get_source_info_list(self.context, self.pa_cbs['source_info'], None)
+        self.operation = pa_context_get_source_info_list(self.context, self.pa_cbs['source_list'], None)
 
     @_action_sync
     def get_server_info(self):
-        self.operation = pa_context_get_server_info(self.context, self.pa_cbs['server_info'], None)
+        self.operation = pa_context_get_server_info(self.context, self.pa_cbs['server'], None)
 
     @_action_sync
     def card_list(self):
-        self.operation = pa_context_get_card_info_list(self.context, self.pa_cbs['card_info'], None)
+        self.operation = pa_context_get_card_info_list(self.context, self.pa_cbs['card_list'], None)
 
     @_action_sync
     def client_list(self):
-        self.operation = pa_context_get_client_info_list(self.context, self.pa_cbs['client_info'], None)
+        self.operation = pa_context_get_client_info_list(self.context, self.pa_cbs['client_list'], None)
 
     @_action_sync
     def sink_input_mute(self, index, mute):
@@ -905,6 +897,7 @@ class PulseSourceOutputInfo(PulseSource):
         self.client_id = pa_source_output_info.client
         self.source = self.owner = pa_source_output_info.source
         self.driver = pa_source_output_info.driver
+        self.application_id = pa_proplist_gets(pa_source_output_info.proplist, b'application.id')
 
     def __str__(self):
         if self.client:
@@ -971,7 +964,7 @@ class Bar():
             media_name = ': {}'.format(media_fullname.replace('|', ' '))
             if media_fullname != self.fullname and media_name != self.media_name:
                 self.media_name, self.media_name_wide = media_name, False
-                if len(media_name) != len(pa.media_name) + 2:  # contains multi-byte chars which might be wide
+                if len(media_fullname) != len(pa.media_name):  # contains multi-byte chars which might be wide
                     self.media_name_widths = [int(east_asian_width(c) == 'W') + 1 for c in media_name]
                     self.media_name_wide = 2 in self.media_name_widths
         else:
@@ -1080,8 +1073,7 @@ class Screen():
                 except:
                     self.gray_gradient = [curses.A_NORMAL] * 3
         else:
-            # if term has colors start them regardless of --color to avoid weird backgrounds
-            # on some terminals
+            # if term has colors start them regardless of --color to avoid weird backgrounds on some terminals
             if curses.has_colors():
                 curses.start_color()
                 curses.use_default_colors()
@@ -1114,8 +1106,7 @@ class Screen():
         return c
 
     def pregetcher(self):
-        # curses.getch doesn't work well with threads
-        # so have to improvise ¯\_(ツ)_/¯
+        # because curses.getch doesn't work well with threads
         while True:
             select([sys.stdin], [], [], 10)
             self.ev.set()
@@ -1453,7 +1444,9 @@ class Screen():
             self.data = self.build(self.modes_data[0][0], PULSE.sink_list(), PULSE.sink_input_list())
             self.data = self.add_spacers(self.data)
         elif self.mode[1]:
-            self.data = self.build(self.modes_data[1][0], PULSE.source_list(), PULSE.source_output_list())
+            ids = (b'org.PulseAudio.pavucontrol', b'org.gnome.VolumeControl', b'org.kde.kmixd', b'pulsemixer')
+            source_output_list = [s for s in PULSE.source_output_list() if s.application_id not in ids]
+            self.data = self.build(self.modes_data[1][0], PULSE.source_list(), source_output_list)
             self.data = self.add_spacers(self.data)
         elif self.mode[2]:
             self.data = self.build(self.modes_data[2][0], PULSE.card_list(), [])
