@@ -7,7 +7,7 @@ CLI and curses mixer for PulseAudio
 
 ## Installation
 
-Pulsemixer is a self-sufficient single-file python script that doesn't require any extra libraries. You can simply download [pulsemixer](https://raw.githubusercontent.com/GeorgeFilipkin/pulsemixer/master/pulsemixer) manually, do `chmod +x ./pulsemixer` and put it anywhere you want.
+Pulsemixer is a self-sufficient single-file python app that doesn't require any extra libraries. You can simply download [pulsemixer](https://raw.githubusercontent.com/GeorgeFilipkin/pulsemixer/master/pulsemixer) manually, do `chmod +x ./pulsemixer` and put it anywhere you want.
 
 Below are some more convenient ways to install pulsemixer:
 
@@ -20,7 +20,7 @@ curl https://raw.githubusercontent.com/GeorgeFilipkin/pulsemixer/master/pulsemix
 ##### pip
 
 ```
-pip3 install pulsemixer
+pip install pulsemixer
 ```
 
 ## Interactive mode
@@ -155,8 +155,6 @@ step-big = 10
 [style]
 ;; Pulsemixer will use these characters to draw interface
 ;; Single characters only
-;; Keep in mind that vte-based terminals might have problems displaying wide unicode symbols
-;;      https://bugzilla.gnome.org/show_bug.cgi?id=772890
 ; bar-top-left       = ┌
 ; bar-left-mono      = ╶
 ; bar-top-right      = ┐
