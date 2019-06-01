@@ -20,7 +20,7 @@
   --no-mouse            disable mouse support
   --create-config       generate configuration file'''
 
-VERSION = '1.4.0'
+VERSION = '1.5.0'
 
 import curses
 import functools

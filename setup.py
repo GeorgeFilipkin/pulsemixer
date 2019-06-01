@@ -4,8 +4,8 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(name='pulsemixer',
-    version='1.4.0',
-    description='pulsemixer - cli and curses mixer for pulseaudio',
+    version='1.5.0',
+    description='pulsemixer - CLI and curses mixer for PulseAudio',
     long_description=long_description,
     long_description_content_type="text/markdown",
     url='https://github.com/GeorgeFilipkin/pulsemixer',
@@ -22,4 +22,3 @@ setup(name='pulsemixer',
         'Topic :: Utilities',
     ],
 )
-
