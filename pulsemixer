@@ -1039,7 +1039,10 @@ class Screen():
         self.focus_line_num = 0
         self.lines, self.cols = curses.LINES - 2, curses.COLS - 1
         self.info, self.menu = str, str
-        self.menu_titles = ['F1 Output', 'F2 Input', 'F3 Cards']
+        self.mode_keys = self.get_mode_keys()
+        self.menu_titles = ['{} Output'.format(self.mode_keys[0]),
+                            '{} Input'.format(self.mode_keys[1]),
+                            '{} Cards'.format(self.mode_keys[2])]
         self.data = []
         self.mode = {0: 1, 1: 0, 2: 0}
         self.modes_data = [[[], 0, 0] for i in range(6)]
@@ -1574,6 +1577,10 @@ class Screen():
         self.display_line(self.lines + 1, self.info)
         self.screen.refresh()
 
+    def get_mode_keys(self):
+        return [re.compile(r'[()]|KEY_').sub('', curses.keyname(k[0]).decode('utf-8')) for k in [
+                CFG.keys.mode1, CFG.keys.mode2, CFG.keys.mode3]]
+
     def display_helpwin(self):
         '''j k   ↑ ↓               Navigation
         h l   ← →               Change volume
@@ -1582,13 +1589,13 @@ class Screen():
         m                       Mute/Unmute
         Space                   Lock/Unlock channels
         Enter                   Context menu
-        F1 F2 F3                Change modes
+        {} {} {}                Change modes
         Tab   Shift Tab         Next/Previous mode
         Mouse click             Select device or mode
         Mouse wheel             Volume change
         Esc q                   Quit'''
         self.helpwin.erase()
-        for i, s in enumerate(self.display_helpwin.__doc__.split('\n')):
+        for i, s in enumerate(self.display_helpwin.__doc__.format(*self.mode_keys).split('\n')):
             self.helpwin.addstr(i + 1, 2, s.strip(), curses.A_NORMAL)
         self.helpwin.border()
         self.helpwin.refresh()
