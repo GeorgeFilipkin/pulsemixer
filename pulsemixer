@@ -1582,21 +1582,22 @@ class Screen():
                 CFG.keys.mode1, CFG.keys.mode2, CFG.keys.mode3]]
 
     def display_helpwin(self):
-        '''j k   ↑ ↓               Navigation
-        h l   ← →               Change volume
-        H L   Shift←  Shift→    Change volume by 10
-        1 2 3 .. 8 9 0          Set volume to 10%-100%
-        m                       Mute/Unmute
-        Space                   Lock/Unlock channels
-        Enter                   Context menu
-        {} {} {}                Change modes
-        Tab   Shift Tab         Next/Previous mode
-        Mouse click             Select device or mode
-        Mouse wheel             Volume change
-        Esc q                   Quit'''
+        doc = (('j k   ↑ ↓',                        'Navigation'),
+               ('h l   ← →',                        'Change volume'),
+               ('H L   Shift←  Shift→',             'Change volume by 10'),
+               ('1 2 3 .. 8 9 0',                   'Set volume to 10%-100%'),
+               ('m',                                'Mute/Unmute'),
+               ('Space',                            'Lock/Unlock channels'),
+               ('Enter',                            'Context menu'),
+               ('{} {} {}'.format(*self.mode_keys), 'Change modes'),
+               ('Tab   Shift Tab',                  'Next/Previous mode'),
+               ('Mouse click',                      'Select device or mode'),
+               ('Mouse wheel',                      'Volume change'),
+               ('Esc q',                            'Quit'))
+        win_width, desc_maxlen = self.helpwin.getmaxyx()[1] - 4, max(len(x[1]) for x in doc)
         self.helpwin.erase()
-        for i, s in enumerate(self.display_helpwin.__doc__.format(*self.mode_keys).split('\n')):
-            self.helpwin.addstr(i + 1, 2, s.strip(), curses.A_NORMAL)
+        for i, s in enumerate(doc):
+            self.helpwin.addstr(i + 1, 2, s[0] + ' ' * (win_width - desc_maxlen - len(s[0])) + s[1])
         self.helpwin.border()
         self.helpwin.refresh()
 
