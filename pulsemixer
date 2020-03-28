@@ -1537,7 +1537,10 @@ class Screen():
             cols = self.cols - 31 - off - len(tree)
             vol = list(CFG.style.bar_off * (cols - (cols % 3 != 0)))
             n = int(len(vol) * bar.volume[bartype] / bar.maxsize)
-            vol[:n] = CFG.style.bar_on * n
+            if bar.muted:
+                vol[:n] = CFG.style.bar_on_muted * n
+            else:
+                vol[:n] = CFG.style.bar_on * n
             vol = ''.join(vol)
             if bartype is Bar.LEFT:
                 if bar.pa.name in (self.server_info.default_sink_name, self.server_info.default_source_name):
@@ -1760,7 +1763,7 @@ class Config():
             mouse = True
 
         class Style:
-            _bar_style = os.getenv('PULSEMIXER_BAR_STYLE', '┌╶┐╴└┘▮- ──').ljust(11, '?')
+            _bar_style = os.getenv('PULSEMIXER_BAR_STYLE', '┌╶┐╴└┘▮▯- ──').ljust(11, '?')
             bar_top_left       = _bar_style[0]
             bar_left_mono      = _bar_style[1]
             bar_top_right      = _bar_style[2]
@@ -1768,10 +1771,11 @@ class Config():
             bar_bottom_left    = _bar_style[4]
             bar_bottom_right   = _bar_style[5]
             bar_on             = _bar_style[6]
-            bar_off            = _bar_style[7]
-            arrow              = _bar_style[8]
-            arrow_focused      = _bar_style[9]
-            arrow_locked       = _bar_style[10]
+            bar_on_muted       = _bar_style[7]
+            bar_off            = _bar_style[8]
+            arrow              = _bar_style[9]
+            arrow_focused      = _bar_style[10]
+            arrow_locked       = _bar_style[11]
             default_stream     = '*'
             info_locked        = 'L'
             info_unlocked      = 'U'
@@ -1832,6 +1836,7 @@ class Config():
         ; bar-bottom-left    = └
         ; bar-bottom-right   = ┘
         ; bar-on             = ▮
+        ; bar-on-muted       = ▯
         ; bar-off            = -
         ; arrow              = ' '
         ; arrow-focused      = ─

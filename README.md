@@ -113,7 +113,7 @@ $ pulsemixer --id sink-input-686 --change-volume +10 --max-volume 100
 ```
 
 ## Configuration
-Optional.  
+Optional.
 The config file will not be created automatically. Do `pulsemixer --create-config` or copy-paste it from here.
 
 ```ini
@@ -124,7 +124,7 @@ The config file will not be created automatically. Do `pulsemixer --create-confi
 [general]
 step = 1
 step-big = 10
-; server = 
+; server =
 
 [keys]
 ;; To bind "special keys" such as arrows see "Key constant" table in
@@ -162,6 +162,7 @@ step-big = 10
 ; bar-bottom-left    = └
 ; bar-bottom-right   = ┘
 ; bar-on             = ▮
+; bar-on-muted       = ▯
 ; bar-off            = -
 ; arrow              = ' '
 ; arrow-focused      = ─
@@ -180,10 +181,10 @@ step-big = 10
 ; 'AudioIPC Server' = 'Firefox'
 ```
 
-The old environment variable `PULSEMIXER_BAR_STYLE` is still supported.  
+The old environment variable `PULSEMIXER_BAR_STYLE` is still supported.
 To change the volume bar's appearance in (e.g.) zsh without creating the config file:
 ```bash
-export PULSEMIXER_BAR_STYLE="╭╶╮╴╰╯◆· ──"
+export PULSEMIXER_BAR_STYLE="╭╶╮╴╰╯◆◇· ──"
 ```
 
 ## See also
