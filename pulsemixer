@@ -1763,7 +1763,7 @@ class Config():
             mouse = True
 
         class Style:
-            _bar_style = os.getenv('PULSEMIXER_BAR_STYLE', '┌╶┐╴└┘▮▯- ──').ljust(11, '?')
+            _bar_style = os.getenv('PULSEMIXER_BAR_STYLE', '┌╶┐╴└┘▮▯- ──').ljust(12, '?')
             bar_top_left       = _bar_style[0]
             bar_left_mono      = _bar_style[1]
             bar_top_right      = _bar_style[2]
