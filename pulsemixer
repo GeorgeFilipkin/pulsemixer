@@ -960,7 +960,7 @@ class Bar():
         self.stream_index = stream_index
         self.volume = pa.volume.values
         if hasattr(pa, 'media_name'):
-            media_fullname = pa.media_name.decode()
+            media_fullname = pa.media_name.decode().replace('\n', ' ')
             media_name = ': {}'.format(media_fullname.replace('|', ' '))
             if media_fullname != self.fullname and media_name != self.media_name:
                 self.media_name, self.media_name_wide = media_name, False
