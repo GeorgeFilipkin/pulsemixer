@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(name='pulsemixer',
-    version='1.5.0',
+    version='1.5.1',
     description='pulsemixer - CLI and curses mixer for PulseAudio',
     long_description=long_description,
     long_description_content_type="text/markdown",
