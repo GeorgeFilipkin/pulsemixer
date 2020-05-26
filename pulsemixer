@@ -36,9 +36,9 @@ from collections import OrderedDict
 from configparser import ConfigParser
 from ctypes import *
 from itertools import takewhile
+from os import get_terminal_size
 from pprint import pprint
 from select import select
-from shutil import get_terminal_size
 from textwrap import dedent
 from time import sleep
 from unicodedata import east_asian_width
