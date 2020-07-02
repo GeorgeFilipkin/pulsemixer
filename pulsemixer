@@ -940,7 +940,10 @@ class Bar():
             self.name = pa
             return
         if type(pa) in (PulseSinkInfo, PulseSourceInfo, PulseCard):
-            self.fullname = pa.description.decode()
+            if pa.description:
+                self.fullname = pa.description.decode()
+            else:
+                self.fullname = pa.name.decode()
         else:
             self.fullname = pa.client.name.decode()
         self.name = re.sub(r'^ALSA plug-in \[|\]$', '', self.fullname.replace('|', ' '))
