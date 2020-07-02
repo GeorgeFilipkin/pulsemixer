@@ -47,7 +47,10 @@ from unicodedata import east_asian_width
 # v bindings
 
 try:
-    DLL = CDLL("libpulse.so.0")
+    if sys.platform == "darwin":
+        DLL = CDLL("libpulse.dylib")
+    else:
+        DLL = CDLL("libpulse.so.0")
 except Exception as e:
     sys.exit(e)
 
