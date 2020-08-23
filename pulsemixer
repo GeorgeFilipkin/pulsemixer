@@ -930,7 +930,7 @@ class PulseVolume(DebugMixin):
 
 class Bar():
     # should be in correct order
-    LEFT, RIGHT, RLEFT, RRIGHT, CENTER, SUB, SLEFT, SRIGHT, NONE = range(9)
+    NONE, LEFT, RIGHT, RLEFT, RRIGHT, CENTER, SUB, SLEFT, SRIGHT = range(-1, 8)
 
     def __init__(self, pa):
         if type(pa) is str:
@@ -1170,7 +1170,7 @@ class Screen():
         if side is Bar.NONE:
             self.info = str
             return
-        side = 'All' if bar.locked else 'Mono' if bar.channels == 1 else self.SIDES[side]
+        side = 'All' if bar.locked else 'Mono' if bar.channels == 1 else self.SIDES[side] if len(self.SIDES) > side else 'AUX {}'.format(side - len(self.SIDES))
         more = '↕' if bottom < self.n_lines and self.top_line_num > 0 else '↑' if self.top_line_num > 0 else '↓' if bottom < self.n_lines else ' '
         name = '{}: {}'.format(bar.name, side)
         if len(name) > self.cols - 8:
