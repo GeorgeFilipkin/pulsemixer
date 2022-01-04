@@ -1088,7 +1088,7 @@ class Screen():
         self.submenu_show = False
         self.submenu = curses.newwin(curses.LINES, 0, 0, 0)
         self.helpwin_show = False
-        self.helpwin = curses.newwin(14, 50, 0, 0)
+        self.helpwin = curses.newwin(16, 50, 0, 0)
         try:
             self.helpwin.mvwin((curses.LINES // 2) - 7, (curses.COLS // 2) - 25)
         except:
@@ -1359,6 +1359,12 @@ class Screen():
                     self.scroll(self.DOWN)
                 if not self.data[self.top_line_num + self.focus_line_num][0]:
                     self.scroll(self.DOWN)
+
+            elif c in CFG.keys.up_big:
+                self.scroll_to_sinksource(self.UP)
+            elif c in CFG.keys.down_big:
+                self.scroll_to_sinksource(self.DOWN)
+
             elif c in CFG.keys.top:
                 self.scroll_first()
             elif c in CFG.keys.bottom:
@@ -1586,6 +1592,8 @@ class Screen():
 
     def display_helpwin(self):
         doc = (('j k   ↑ ↓',                        'Navigation'),
+               ('J K   Shift↑ Shift↓',              'Jump to Sink/Source'),
+               ('g G   Home End',                   'Jump to Top/Bottom'),
                ('h l   ← →',                        'Change volume'),
                ('H L   Shift←  Shift→',             'Change volume by 10'),
                ('1 2 3 .. 8 9 0',                   'Set volume to 10%-100%'),
@@ -1728,6 +1736,26 @@ class Screen():
         for _ in range(self.n_lines): self.scroll(self.DOWN)
 
 
+    def scroll_to_sinksource(self, direction):
+      focus = self.top_line_num + self.focus_line_num
+      l = focus
+
+      while l >= self.top_line_num and l < self.n_lines:
+
+        # not sure what causes this to be true but it was happening to me
+        if self.data[l][0] == None:
+          l += direction
+          continue
+
+        if type(self.data[l][0].pa) in (PulseSinkInfo, PulseSourceInfo, PulseCard) \
+            and self.data[l][0] != self.data[focus][0]:
+          self.focus_line_num = l
+          break
+
+        l += direction
+
+
+
 class Config():
 
     def __init__(self):
@@ -1741,6 +1769,9 @@ class Config():
         class Keys:
             up          = [ord('k'), curses.KEY_UP, curses.KEY_PPAGE]
             down        = [ord('j'), curses.KEY_DOWN, curses.KEY_NPAGE]
+            # 337 and 336 for Shift+Up and Shift+Down found by trial+error, may not work accross all terminals?
+            up_big      = [ord('K'), 337, curses.KEY_SPREVIOUS]
+            down_big    = [ord('J'), 336, curses.KEY_SNEXT]
             left        = [ord('h'), curses.KEY_LEFT]
             right       = [ord('l'), curses.KEY_RIGHT]
             left_big    = [ord('H'), curses.KEY_SLEFT]
@@ -1805,6 +1836,8 @@ class Config():
         ;; https://docs.python.org/3/library/curses.html#constants
         ; up        = k, KEY_UP, KEY_PPAGE
         ; down      = j, KEY_DOWN, KEY_NPAGE
+        ; up-big    = K, KEY_SPREVIOUS
+        ; down-big  = J, KEY_SNEXT
         ; left      = h, KEY_LEFT
         ; right     = l, KEY_RIGHT
         ; left-big  = H, KEY_SLEFT
