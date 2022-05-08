@@ -1910,7 +1910,7 @@ def main():
              "color=", "server=", "no-mouse", "create-config"])
     except getopt.GetoptError as e:
         sys.exit("ERR: {}".format(e))
-    assert args == [], sys.exit('ERR: {} not not recognized'.format(' '.join(args).strip()))
+    assert args == [], sys.exit('ERR: {} not recognized'.format(' '.join(args).strip()))
     dopts = dict(opts)
 
     if '-h' in dopts or '--help' in dopts:
