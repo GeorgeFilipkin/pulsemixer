@@ -12,6 +12,7 @@ setup(name='pulsemixer',
     author='George Filipkin',
     author_email='botebotebot@gmail.com',
     license='MIT',
+    packages=[],
     scripts=['pulsemixer'],
     classifiers=[
         'Environment :: Console',
