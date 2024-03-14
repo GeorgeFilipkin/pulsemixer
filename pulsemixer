@@ -1366,6 +1366,12 @@ class Screen():
 
             elif c in CFG.keys.mute:
                 bar.mute_toggle()
+            elif c in CFG.keys.default:
+                pa = self.data[self.top_line_num + self.focus_line_num][0].pa
+                if type(pa) is PulseSinkInfo:
+                    PULSE.set_default_sink(pa.name)
+                else:
+                    PULSE.set_default_source(pa.name)
             elif c in CFG.keys.lock:
                 bar.lock_toggle()
             elif c in CFG.keys.left or any([c & i for i in self.SCROLL_DOWN]):
@@ -1753,6 +1759,7 @@ class Config():
             next_mode   = [self._more_keys['KEY_TAB']]
             prev_mode   = [curses.KEY_BTAB]
             mute        = [ord('m')]
+            default     = [ord('d')]
             lock        = [ord(' ')]
             quit        = [ord('q'), self._more_keys['KEY_ESC']]
 
@@ -1817,6 +1824,7 @@ class Config():
         ; next-mode = KEY_TAB
         ; prev-mode = KEY_BTAB
         ; mute      = m
+        ; default   = d
         ; lock      = ' '  ; 'space', quotes are stripped
         ; quit      = q, KEY_ESC
 
